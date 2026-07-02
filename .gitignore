@@ -18,10 +18,18 @@ ipch/
 *.suo
 *.user
 
-# ---- Third-party SDK (manually downloaded, not vendored in git -
-#      run ADICTICallCenter/ADICTICallCenter/third_party/Fetch-WebView2Sdk.ps1
-#      to re-fetch; see doc/ADICTICallCenter-MFC改版說明.md for details) ----
-ADICTICallCenter/ADICTICallCenter/third_party/WebView2/build/
+# ---- Third-party SDK (WebView2) ----
+# build/native/{include,x64,x86} IS vendored in git (this native MFC project has no
+# NuGet restore configured) - see doc/ADICTICallCenter-MFC改版說明.md for details.
+# The lines below re-include the two subfolders that would otherwise be swallowed by
+# the generic x64/ and x86/ build-artifact rules above, and explicitly exclude the
+# unused pieces of the nupkg (other platforms, managed/WinRT projections) so nobody
+# re-vendors them by accident. To bump the SDK version, see
+# ADICTICallCenter/ADICTICallCenter/third_party/Fetch-WebView2Sdk.ps1.
+!ADICTICallCenter/ADICTICallCenter/third_party/WebView2/build/native/x64/
+!ADICTICallCenter/ADICTICallCenter/third_party/WebView2/build/native/x86/
+ADICTICallCenter/ADICTICallCenter/third_party/WebView2/build/native/arm64/
+ADICTICallCenter/ADICTICallCenter/third_party/WebView2/build/native/include-winrt/
 ADICTICallCenter/ADICTICallCenter/third_party/WebView2/lib/
 ADICTICallCenter/ADICTICallCenter/third_party/WebView2/lib_manual/
 ADICTICallCenter/ADICTICallCenter/third_party/WebView2/runtimes/
