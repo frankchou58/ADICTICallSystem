@@ -1,0 +1,20 @@
+body {
+	background-color:rgb(225 235 207);
+	}	
+
+.chartWrapper {
+ position: relative;
+}
+
+.chartWrapper > canvas {
+	responsive: true;
+  position: relative;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+
+.chartAreaWrapper {
+ 	height: 500px;
+  width: 85%;
+}

@@ -1,0 +1,141 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<meta charset="utf-8" />
+		<script type="text/javascript">
+			function OutPortsStatus()
+			{
+				sessionStorage.setItem("Page", 1);
+				top.location.href="index.html";
+			}
+			function Devices()
+			{
+				sessionStorage.setItem("Page", 2);
+				sessionStorage.setItem("EditDevice", false);
+				top.location.href="index.html";
+			}
+			function Routers()
+			{
+				sessionStorage.setItem("Page", 3);
+				sessionStorage.setItem("EditBridge", false);
+				sessionStorage.setItem("RouterPageType", 0);
+				top.location.href="index.html";
+			}
+			
+			function ChangePassword()
+			{
+				sessionStorage.setItem("Page", 5);
+				top.location.href="index.html";
+			}
+			
+			function LineSetting()
+			{
+				sessionStorage.setItem("Page", 6);
+				top.location.href="index.html";
+			}
+			
+			function HeartRate()
+			{
+				sessionStorage.setItem("Page", 1);
+				top.location.href="index.html";
+			}
+			
+			function Steps()
+			{
+				sessionStorage.setItem("Page", 2);
+				top.location.href="index.html";
+			}
+			
+			function BP()
+			{
+				sessionStorage.setItem("Page", 3);
+				top.location.href="index.html";
+			}
+
+			function SpO2()
+			{
+				sessionStorage.setItem("Page", 4);
+				top.location.href="index.html";
+			}
+
+			function ActiveMins()
+			{
+				sessionStorage.setItem("Page", 5);
+				top.location.href="index.html";
+			}
+			
+			function Calories()
+			{
+				sessionStorage.setItem("Page", 6);
+				top.location.href="index.html";
+			}
+			
+			function Hrv()
+			{
+				sessionStorage.setItem("Page", 7);
+				top.location.href="index.html";
+			}
+			
+			function AbHeartRate()
+			{
+				sessionStorage.setItem("Page", 8);
+				top.location.href="index.html";
+			}
+
+			function Temp()
+			{
+				sessionStorage.setItem("Page", 9);
+				top.location.href="index.html";
+			}
+
+			function ECG()
+			{
+				sessionStorage.setItem("Page", 10);
+				top.location.href="index.html";
+			}
+
+			function Alarm()
+			{
+				sessionStorage.setItem("Page", 11);
+				top.location.href="index.html";
+			}
+			
+		</script>
+	</head>
+	<body style="background-color:rgb(201 251 145);">
+		<Center>
+			<div id=Management style="display">
+				<input type="button" name="Btn1" id="Btn1" value="外線狀態" onclick="OutPortsStatus()"/><BR><BR>
+				<input type="button" name="Btn2" id="Btn2" value="通話紀錄" onclick="Devices()" /><BR><BR>
+				<!--<input type="button" name="changePasswordBtn" id="changePasswordBtn" value="變更密碼" onclick="ChangePassword()" /><BR>
+				<input type="button" name="linesetting" id="LineSettingBtn" value="LINE設定" onclick="LineSetting()" />-->
+			</div>
+		</Center>
+		
+		<script type="text/javascript">
+			var mode = sessionStorage.getItem("Mode");
+			if(mode == 2)
+			{
+				document.getElementById("Management").style.display = 'block';
+				document.getElementById("Btn1").value = "員工管理";
+				document.getElementById("Btn2").value = "客戶管理";
+				document.getElementById("changePasswordBtn").style.display = 'none';
+			}
+			else if(mode == 3)
+			{
+				document.getElementById("Management").style.visibility = 'display';
+				document.getElementById("Btn1").value = "外線狀態";
+				document.getElementById("Btn2").value = "通話紀錄";
+				document.getElementById("changePasswordBtn").style.display = 'block';
+				//document.getElementById("LineSettingBtn").style.display = 'block';
+			}
+			else if(mode == 4)
+			{
+				document.getElementById("Management").style.display = 'none';
+			}
+			else
+			{
+				document.getElementById("Management").style.display = 'none';
+			}
+		</script>
+	</body>	
+</html>

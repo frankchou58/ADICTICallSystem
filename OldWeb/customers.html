@@ -1,0 +1,112 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<meta charset="utf-8" />
+		<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script type="text/javascript" src="scripts/jquery.js"></script> -->
+		<script type="text/javascript" src="scripts/main.js?3"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			GetCustomersInfo();
+	  	var CustomersArray = sessionStorage.getItem("Customers");
+			console.log("CustomersArray = " + CustomersArray);
+  		var Customers = JSON.parse(CustomersArray);
+			var Numbers = Customers.numbers;
+			console.log("Number = " + Numbers);
+			
+			function chooseCustomer(number)
+			{
+				var CustomerInfo = Customers.data[number];
+				console.log("CustomerInfo = " + CustomerInfo);
+				sessionStorage.setItem("CustomerInfo", CustomerInfo);
+				sessionStorage.setItem("EditDevice", true);
+				sessionStorage.setItem("Mode", 2);
+				sessionStorage.setItem("Page", 2);				
+				top.location.href="index.html";
+			}
+			
+	  	function createTable()
+	  	{
+				var tableNode; 
+				sessionStorage.setItem("EditUser", false);
+	  		for(let i = 0; i < Numbers; i++)
+	  		{
+					tableNode = document.getElementById("work_table");
+					var trNode = tableNode.insertRow(); 
+					var tdEdit = trNode.insertCell(); 
+					var btn = document.createElement('input');
+					btn.type = "button";
+					btn.className = "btn";
+					btn.value = "編輯";
+					btn.onclick = (function(i) {return function() {chooseCustomer(i);}})(i);
+					tdEdit.appendChild(btn);
+
+					var tdCustomerId = trNode.insertCell(); 
+					tdCustomerId.innerHTML = Customers.data[i][1];
+
+					var IsInBlackList = Customers.data[i][10];
+					var InBlackList = '';
+					if(IsInBlackList == 1)
+						InBlackList = '是';
+					var tdCustomerId = trNode.insertCell(); 
+					tdCustomerId.style.cssText = 'color: red; text-align: center;';
+					tdCustomerId.innerHTML = InBlackList;
+
+
+					var tdCustomerName = trNode.insertCell(); 
+					tdCustomerName.innerHTML = Customers.data[i][3];
+					
+					var ThisYear = new Date().getFullYear();
+					var tdCustomerAge = trNode.insertCell();
+					var Birthday = Customers.data[i][9].split('-');
+					console.log('Birthday=' + Birthday[0]);
+					var Age = ThisYear - Birthday[0];
+					console.log('Age=' + Age);
+					tdCustomerAge.innerHTML = Age + '歲';
+	  			
+	  			Gender = Customers.data[i][4];
+					var tdGenderName = trNode.insertCell(); 
+					if(Gender == 1)
+						tdGenderName.innerHTML = '男';
+					else if(Gender == 2)
+						tdGenderName.innerHTML = '女';
+	  			
+					var tdTelNo = trNode.insertCell(); 
+					tdTelNo.innerHTML = Customers.data[i][5];
+	  			
+					var tdAddress = trNode.insertCell(); 
+					tdAddress.innerHTML = Customers.data[i][6] + Customers.data[i][7] + Customers.data[i][8];
+
+					document.getElementById("div1").appendChild(tableNode);
+				}
+			}
+			
+			function AddCustomerPage()
+			{
+				sessionStorage.setItem("Page", 5);
+				top.location.href="index.html";
+			}
+			
+		</script>
+	</head>
+	
+	<body">
+		<input type="button" name="AddCustomer" id="AddCustomer" value="新增客戶" onclick="AddCustomerPage()"/><BR>
+		<table border="1" id="work_table">
+  		<colgroup>
+	    	<col span="10" style="background-color:rgb(220 220 220);">
+  		</colgroup>
+  		<tr>
+    		<th width=50>編輯</th>
+    		<th width=100>客戶識別碼</th>
+    		<th width=150>在黑名單嗎?</th>
+    		<th width=80>姓名</th>
+    		<th width=80>年齡</th>
+    		<th width=80>性別</th>
+    		<th width=120>電話</th>
+    		<th width=800>地址</th>
+  		</tr>
+		</table>
+		<div id="div1"></div>
+		<script type="text/javascript">createTable();</script>
+	</body>	
+</html>

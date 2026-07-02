@@ -1,0 +1,99 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<meta charset="utf-8" />
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script type="text/javascript" src="scripts/main.js?4"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			var chkAdmin;
+			var chkUser;
+			var username;
+			var resetpassword;
+			var Result; 
+			var Val;
+			//var ExtNumer;
+			
+			function ResetPasswordResponse()
+			{
+ 				console.log(this.status);       	
+  			if(this.readyState === XMLHttpRequest.DONE && this.status === 200)
+  			{
+  				console.log(this.responseText);
+  				//var respnse = ﻿"{\"status\":true,\"message\":\"Reset Password and then send new Password by E-Mail\"}";
+  				//console.log("respnse: " + respnse);
+  				Val = JSON.parse(this.responseText);
+  				console.log("Val.status: " + Val.status);
+  				if(Val.status == true)
+  				{
+  					Result = true;
+			  	}
+			  	else
+			  	{
+  					Result = false;
+			  	}
+  			}
+			}
+			
+			function ResetPassword()
+			{
+			}
+			
+ 			function LoadDefault()
+ 			{
+				chkAdmin = document.getElementById("chkAdmin");
+				chkUser  = document.getElementById("chkUser");
+			 	username = document.getElementById("username");
+ 				resetpassword = document.getElementById("ResetPasswordBtn");
+				username.style.display = "none";
+				resetpassword.style.display = "none";
+			}
+
+			function ShowHideUsername()
+			{
+				var KeyId = sessionStorage.getItem('KeyId');
+				console.log("Key=" + KeyId);
+		
+				const $result = $("#result");
+ 				$result.text('');
+	
+				username.style.display = "none";
+				
+				if(chkAdmin.checked)
+				{
+					CheckAdminData();
+					username.style.display = "block";
+				}
+				else if(chkUser.checked)
+				{
+					username.style.display = "block";
+					resetpassword.style.display = "block";
+				}
+			}
+		</script>
+	</head>
+	<body>
+		<Center>
+			<label for="chkAdmin">
+		    <input type="radio" name="myRadios" id="chkAdmin" onclick="ShowHideUsername()"/>管理者
+			</label>
+			<label for="chkUser">
+		    <input type="radio" name="myRadios" id="chkUser" onclick="ShowHideUsername()"/>使用者
+			</label>
+ 			<form name="myLogin">
+ 				<div id="username" style="display">
+					帳號:<INPUT TYPE=TEXT NAME="username" SIZE=20 VALUE=""><BR>
+				</div>
+				密碼:<INPUT TYPE=PASSWORD NAME="pwd" SIZE=20 VALUE=""><BR>
+<!-- 				<div id="ExtNumer" style="display" required>
+					座席號碼:<INPUT TYPE=TEXT NAME="ExtNumer" SIZE=20 VALUE="" required><BR>
+				</div>
+-->				
+				<input type="button" NAME="login" id="BtnLogin" value="提交" onclick="Login()"/>
+				<input type="reset" NAME="Resetlogin" id="BtnReset"/>
+				<input type="button" NAME="ResetPasswordBtn" id="ResetPasswordBtn" value="忘記密碼" onclick="ResetPassword()"/>
+			</form>
+			<script type="text/javascript">LoadDefault()</script>
+			<h3 id="result"></h3>
+		</Center>
+	</body>	
+</html>

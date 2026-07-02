@@ -1,0 +1,224 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<title>編輯客戶頁面</title>
+		<meta charset="utf-8" />
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js?2"></script>
+		<script type="text/javascript" src="scripts/main.js"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			var IndexID;
+			var ThisCustomerID;
+			var ThisUUID;
+			var Oldname;
+			var OldGender;
+			var OldTelNo;
+			var OldCounty;
+			var OldTownships;
+			var OldAddress;
+			var OldBirthday;
+			var OldInBlackList;
+			var Response = 1;
+			
+			window.onload=function()
+			{ 
+				var CustomerInfo = sessionStorage.getItem("CustomerInfo");
+				console.log("CustomerInfo: " + CustomerInfo);
+				var split = CustomerInfo.split(',');
+				IndexID = split[0];
+				ThisCustomerID = split[1];
+				ThisUUID = split[2];
+				Oldname = split[3];
+				OldGender = split[4];
+				OldTelNo = split[5];
+				OldCounty = split[6];
+				OldTownships = split[7];
+				OldAddress = split[8];
+				OldBirthday = split[9];
+				OldInBlackList = split[10];
+				var ID = document.getElementById('ID');
+				ID.value = ThisCustomerID;
+				var name = document.getElementById('name');
+				name.value = Oldname;
+				var GenderIndex = document.getElementById('Gender').selectedIndex = OldGender - 1;
+				var TelNo = document.getElementById('telno');
+				TelNo.value = OldTelNo;
+				var County = document.getElementById('county');
+				County.value = OldCounty;			
+				var Townships = document.getElementById('townships');
+				Townships.value = OldTownships;			
+				var Address = document.getElementById('address');
+				Address.value = OldAddress;			
+				var Birthday = document.getElementById('Birthday');
+				Birthday.value = OldBirthday;	
+				var InBlackList = document.getElementById('InBlackList').selectedIndex = OldInBlackList;
+			}			
+			
+			function validateEmail(email)
+			{
+  			const re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  			return re.test(email);
+			}
+			
+
+			function WaitResponse()
+			{
+				var bWaitResponse = 1;
+				while(1)
+				{
+						bWaitResponse = sessionStorage.getItem("bWaitResponse");
+						if(bWaitResponse == 0)
+							break;
+				}
+			}
+			
+			function SetCustomerInfoResponse()
+			{
+				console.log(this.responseText);       	
+				if(this.readyState === XMLHttpRequest.DONE && this.status === 200)
+				{
+					const $result = $("#result");
+					var RespArray = JSON.parse(this.responseText);
+					console.log("Response: " + RespArray.status);
+					if(RespArray.status == false)
+					{
+						Response = 0;
+						$result.text(RespArray.message);	
+					}
+				}
+				bWaitResponse = 0;
+			}
+
+			function SetCustomerInfo(name, GenderValue, TelNo, County, Townships, Address, Birthday, InBlackList)
+			{
+				var URL;
+  			URL = BackEndURL + 'SetCustomerInfo.php?ID=' + IndexID + '&Name=' + name + '&Gender=' + GenderValue + '&TelNo=' + 
+  					TelNo + '&County=' + county.value + '&Townships=' + townships.value + '&Address=' + Address + '&Birthday=' + Birthday + '&InBlackList=' + InBlackList;
+				console.log("URL: " + URL);
+				var xmlHttp = new XMLHttpRequest();
+				xmlHttp.open( "GET", URL, false);
+				xmlHttp.onreadystatechange = SetCustomerInfoResponse;
+				xmlHttp.send();
+			}
+
+			
+			function SaveCustomerInfo()
+			{
+				var name = document.getElementById('name');
+				var GenderIndex = document.getElementById('Gender').selectedIndex + 1;
+				var InBlackList = document.getElementById('InBlackList').selectedIndex;
+				var TelNo = document.getElementById('telno');
+				var County = document.getElementById('county');
+				var Townships = document.getElementById('townships');
+				var Address = document.getElementById('address');
+				var Birthday = document.getElementById('Birthday');
+
+				console.log('IndexID=' + IndexID);
+				console.log("Oldname: " + Oldname);
+				var Changed = false;
+				if(Oldname != name.value)
+				{
+					Changed = true;
+				}
+				if(OldGender != GenderIndex)
+				{
+					Changed = true;
+				}
+				if(OldTelNo != TelNo.value)
+				{
+					Changed = true;
+				}
+				
+				if(OldInBlackList != InBlackList)
+				{
+					Changed = true;
+				}
+				
+				if(OldCounty != County.value)
+				{
+					Changed = true;
+				}
+
+				if(OldTownships != Townships.value)
+				{
+					Changed = true;
+				}
+
+				if(OldAddress != Address.value)
+				{
+					Changed = true;
+				}
+				
+				if(OldBirthday != Birthday.value)
+				{
+					Changed = true;
+				}
+				
+				if(Changed == true)
+				{
+					SetCustomerInfo(name.value, GenderIndex, TelNo.value, County.value, Townships.value, Address.value, Birthday.value, InBlackList);
+				}
+				
+				sessionStorage.setItem("Page", 2);
+				sessionStorage.setItem("EditDevice", false);
+				if(Response == 1)
+					top.location.href="index.html";				
+			}
+			
+			function Back()
+			{
+				sessionStorage.setItem("Page", 2);
+				sessionStorage.setItem("EditDevice", false);
+				top.location.href="index.html";								
+			}
+		</script>
+	</head>
+	<body>
+		<h1>填妥下列表單資料,按下提交修改該使用者資料</h1>
+		<form action="" method="get" class="form-example">
+  		<div class="form-example">
+    		<label for="Customerid">客戶識別碼: </label>
+    		<input type="text" id="ID" >
+  		</div>
+  		<div class="form-example">
+    		<label for="name">姓名: </label>
+    		<input type="text" name="name" id="name" required>
+  		</div>
+  		<div class="form-example">
+    		<label for="InBlackList">在黑名單中: </label>
+  			<select id="InBlackList" required>
+  				<option>否</option>
+  				<option>是</option>
+				</select>
+  		</div>
+  		<div class="form-example">
+    		<label for="Gender">性別: </label>
+  			<select id="Gender" required>
+  				<option>男</option>
+  				<option>女</option>
+				</select>
+  		</div>
+  		<div class="form-example">
+    		<label for="telno">聯絡電話: </label>
+    		<input type="text" name="telno" id="telno" required>
+  		</div>
+  		<div class="form-example">
+    		<label for="address">通訊地址: </label>
+    		<input type="text" name="county" id="county" size=5 required>縣市
+    		<input type="text" name="townships" id="townships" size=5 required>鄉鎮市區
+    		<input type="text" name="address" id="address" size=15 required>
+  		</div>
+  		<div class="form-example">
+    		<label for="Birthday">生日: </label>
+    		<input type="date" name="Birthday" id="Birthday" required>
+  		</div>
+  		<div class="form-example">
+ 		<div class="form-example">
+			<form method="post" action="">
+   			<input type="button" value="提交" id="Save" onclick="SaveCustomerInfo()"/>
+   			<input type="reset">
+   			<input type="button" value="返回" id="Return" onclick="Back()"/>
+   		</form>
+ 		<h3 id="result"></h3>
+ 		</div>
+	</body>	
+</html>

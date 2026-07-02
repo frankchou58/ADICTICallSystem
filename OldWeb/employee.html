@@ -1,0 +1,147 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<meta charset="utf-8" />
+		<!-- <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script type="text/javascript" src="scripts/jquery.js"></script> -->
+		<script type="text/javascript" src="scripts/main.js?2"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			GetEmps();
+	  	var OperatorsArray = sessionStorage.getItem("Operators");
+			console.log("OperatorsArray = " + OperatorsArray);
+  		var Operators = JSON.parse(OperatorsArray);
+			var Numbers = Operators.number;
+			console.log("Number = " + Numbers);
+			
+			function chooseEmployee(number)
+			{
+				var EmployeeInfo = Operators.data[number];
+				console.log("EmployeeInfo = " + EmployeeInfo);
+				sessionStorage.setItem("EmployeeInfo", EmployeeInfo);
+				sessionStorage.setItem("EditUser", true);
+				sessionStorage.setItem("Mode", 2);
+				sessionStorage.setItem("Page", 1);				
+				top.location.href="index.html";
+			}
+			
+			function convertToBinary(x) {
+    		let bin = 0;
+    		let rem, i = 1, step = 1;
+    		while (x != 0) {
+	        rem = x % 2;
+        	x = parseInt(x / 2);
+        	bin = bin + rem * i;
+        	i = i * 10;
+	    	}
+  	  	console.log(`Binary: ${bin}`);
+  	  	return bin;
+			}
+			
+			function deleteEmployee(number)
+			{
+				var EmployeeInfo = Operators.data[number];
+				console.log("EmployeeInfo = " + EmployeeInfo);
+
+			}
+	  	function createTable()
+	  	{
+				var tableNode; 
+				sessionStorage.setItem("EditUser", false);
+	  		for(let i = 0; i < Numbers; i++)
+	  			{
+					tableNode = document.getElementById("work_table");
+					var trNode = tableNode.insertRow(); 
+					var tdEdit = trNode.insertCell(); 
+					var btn = document.createElement('input');
+					btn.type = "button";
+					btn.className = "btn";
+					btn.value = "編輯";
+					btn.onclick = (function(i) {return function() {chooseEmployee(i);}})(i);
+					tdEdit.appendChild(btn);
+
+					btn = document.createElement('input');
+					btn.type = "button";
+					btn.className = "btn";
+					btn.value = "刪除";
+					btn.onclick = (function(i) {return function() {deleteEmployee(i);}})(i);
+					tdEdit.appendChild(btn);
+
+					var tdEmployeeId = trNode.insertCell(); 
+					tdEmployeeId.innerHTML = Operators.data[i][0];
+
+					var tdEmployeeCropID = trNode.insertCell(); 
+					tdEmployeeCropID.innerHTML = Operators.data[i][1];
+
+					var tdEmployeeName = trNode.insertCell(); 
+					tdEmployeeName.innerHTML = Operators.data[i][2];
+
+					var tdEmployeeTEL1 = trNode.insertCell(); 
+					tdEmployeeTEL1.innerHTML = Operators.data[i][3];
+
+					var tdEmployeeTEL2 = trNode.insertCell(); 
+					tdEmployeeTEL2.innerHTML = Operators.data[i][4];
+
+					var tdEmployeeConnect = trNode.insertCell(); 
+					tdEmployeeConnect.innerHTML = Operators.data[i][5];
+
+					var tdEmployeeAddr1 = trNode.insertCell(); 
+					tdEmployeeAddr1.innerHTML = Operators.data[i][6];
+
+					var tdEmployeeAddr2 = trNode.insertCell(); 
+					tdEmployeeAddr2.innerHTML = Operators.data[i][7];
+					
+					var tdEmployeeEmpMemo = trNode.insertCell(); 
+					tdEmployeeEmpMemo.innerHTML = Operators.data[i][8];
+
+					var tdEmployeeMachineId = trNode.insertCell(); 
+					tdEmployeeMachineId.innerHTML = Operators.data[i][9];
+
+					var tdEmployeeExtNum = trNode.insertCell(); 
+					tdEmployeeExtNum.innerHTML = Operators.data[i][10];
+	  			
+	  				//var DecValue = Operators.data[i][4];
+	  				//var Bits = convertToBinary(DecValue);
+					//var tdMachineBitMasks = trNode.insertCell(); 
+					//tdMachineBitMasks.innerHTML = Bits;
+	  			
+
+					//var tdExtNum = trNode.insertCell(); 
+					//tdExtNum.innerHTML = Operators.data[i][8];
+					document.getElementById("div1").appendChild(tableNode);
+				}
+			}
+			
+			function AddUserPage()
+			{
+				sessionStorage.setItem("Page", 4);
+				top.location.href="index.html";
+			}
+			
+		</script>
+	</head>
+	
+	<body">
+		<input type="button" name="AddUser" id="AddUser" value="新增使用者" onclick="AddUserPage()"/><BR>
+		<table border="1" id="work_table">
+  		<colgroup>
+	    	<col span="13" style="background-color:rgb(220 220 220);">
+  		</colgroup>
+  		<tr>
+    		<th width=50> 編輯</th>
+    		<th width=60>員工編號</th>
+			<th width=60>公司編號</th>
+    		<th width=120>員工姓名</th>
+			<th width=120>電話1</th>
+			<th width=120>電話2</th>
+			<th width=120>聯絡人</th>
+			<th width=200>戶籍地址</th>
+			<th width=200>通訊地址</th>
+			<th width=200>備註</th>
+    		<th width=120>子機使用對應值</th>
+			<th width=100>配置分機</th>
+  		</tr>
+		</table>
+		<div id="div1"></div>
+		<script type="text/javascript">createTable();</script>
+	</body>	
+</html>

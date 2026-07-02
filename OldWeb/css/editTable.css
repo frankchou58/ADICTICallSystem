@@ -1,0 +1,33 @@
+body {
+	background-color:rgb(193 105 85);
+	}
+	
+table {
+	border:2px solid #000000;
+	border-collapse:collapse;
+	width:auto;
+  overflow-x: scroll;
+}
+table td {
+	border:1px solid #000000;
+	width:500;
+}
+table th {
+ 	color: #f0f0f0;
+	border:1px solid #000000;
+	width:500;
+}
+tbody th {
+	background-color:#006fae;
+}
+
+message {
+	font-size: 30px;
+	font-weight: bold;
+	color: blue;
+	font-style: italic;
+}
+
+p1, p2 {
+	font-size: 30px;
+}

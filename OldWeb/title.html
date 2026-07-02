@@ -1,0 +1,79 @@
+﻿<!DOCTYPE html>
+<html>
+ <head>
+ 	<title>Title</title>
+	<script type="text/javascript" src="scripts/main.js"></script>
+	<script type="text/javascript"> 
+		var DuserNumbers;
+		var Dusers;
+		var mode = sessionStorage.getItem("Mode");
+		var TZIndex;
+
+		function Change()
+		{
+			if(mode == 2 || mode == 3 || mode == 4)
+				mode = 1;
+			sessionStorage.setItem("Mode", mode);			
+			sessionStorage.setItem("Page", 1);
+			sessionStorage.setItem("EditUser", false);
+			sessionStorage.setItem("EditDevice", false);
+			sessionStorage.setItem("EditBridge", false);
+			sessionStorage.setItem("EditDuser", false);		
+			top.location.href="index.html";			
+		}
+    window.onload = function()
+    {
+			duserlist = document.getElementById("duserlist");
+			duserlist.style.display = "none";
+      var psel = document.getElementById("Loginout");
+			console.log("Mode: " + mode);      
+			if(mode == 1)
+	      psel.value = "登入";
+			else if(mode == 2 || mode == 3 || mode == 4)
+			{
+	      psel.value = "登出";
+	      if(mode == 4)
+					duserlist.style.display = "block";	      
+				else
+					duserlist.style.display = "none";	      
+	    }
+	    else
+ 	      psel.value = "登入";
+  	}
+  	function OnChanged()
+  	{
+  		console.log("On Changed");
+			var DuserSelected = document.getElementById('duserlistoption');
+			var SelectedDuserID = DuserSelected.value;
+			var select = document.getElementById("duserlistoption");
+			console.log("SelectedDuserID: " + SelectedDuserID);
+			for(let i = 0; i < DuserNumbers; i++)
+			{
+				if(SelectedDuserID == Dusers.data[i][0])
+	    		select.getElementsByTagName('option')[i].selected = 'selected';
+			}
+			sessionStorage.setItem("Mode", 4);
+			sessionStorage.setItem('DuserID', SelectedDuserID);
+			top.location.href="index.html";			
+  	}
+	</script> 		
+ </head>
+ <body style="background-color:rgb(2 33 206);">
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<img src="ADICTI.jpg" ALIGN=LEFT HSPACE=50>
+	<MARQUEE WIDTH=600 HEIGHT=50 BEHAVIOR=ALTERNATE>
+		<FONT SIZE=50 COLOR=rgb(0 0 0) FACE="標楷體"><b><<<<PP電話中心系統>>>>></b></FONT>
+	</MARQUEE>
+	<input type="button" id="Loginout" onclick="Change()"/>
+	<b><p><cite>
+	<FONT SIZE=5 COLOR=rgb(0 150 150) FACE="微軟正黑體">
+	 	奕誠科技<BR>
+		<div id="duserlist" style="display">
+			切換裝置使用者:
+			<select id="duserlistoption" onchange=OnChanged()>
+			</select>
+		</div>
+	</FONT>
+	</cite></p></b>
+ </body>
+</html>

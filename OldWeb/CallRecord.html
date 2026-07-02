@@ -1,0 +1,287 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<title>通話紀錄查詢</title>
+		<meta charset="utf-8" />
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script type="text/javascript" src="scripts/main.js"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			var ViewTypeIndex;
+			var StartUTC;
+			var EndUTC;
+			var CallRecordInfo;
+			
+   		function LoadData()
+   		{
+	 			var DateSelect = document.getElementById('DateSelect');
+   			console.log("ViewTypeIndex: " + ViewTypeIndex);
+				console.log("Date: " + DateSelect.value);
+				sessionStorage.setItem('SelectedDate', DateSelect.value);
+   			var ThisDay;
+				ThisDay = new Date(DateSelect.value);
+				var ReturnArray = ConvertUTC(ThisDay);
+				var StartUTCDay = ReturnArray[0];
+				var EndUTCDay = ReturnArray[1];
+				var StartUTCOfWeek = ReturnArray[2];
+				var EndUTCOfWeek = ReturnArray[3];
+				var StartUTCOfMonth = ReturnArray[4];
+				var EndUTCOfMonth = ReturnArray[5];
+				var StartUTCOfYear = ReturnArray[6];
+				var EndUTCOfYear = ReturnArray[7];
+				var TypeString;
+
+				if(ViewTypeIndex == 0)
+				{
+					StartUTC = StartUTCDay;
+					EndUTC = EndUTCDay;
+					TypeString = "本日";
+				}
+				else if(ViewTypeIndex == 1)
+				{
+					StartUTC = StartUTCOfWeek;
+					EndUTC = EndUTCOfWeek;
+					TypeString = "本周";
+				}
+				else if(ViewTypeIndex == 2)
+				{
+					StartUTC = StartUTCOfMonth;
+					EndUTC = EndUTCOfMonth;
+					TypeString = "本月";
+				}
+				else if(ViewTypeIndex == 3)
+				{
+					StartUTC = StartUTCOfYear;
+					EndUTC = EndUTCOfYear;
+					TypeString = "本年";
+				}
+			}
+			
+			function ChangeViewType()
+			{
+				var ViewType = document.getElementById('ViewType');
+				ViewTypeIndex = ViewType.selectedIndex;
+				sessionStorage.setItem('SelectedViewTypeIndex', ViewTypeIndex);
+				LoadData();
+				location.reload();
+			}
+
+			function Setdefault()
+			{
+				var SelectedDate =	sessionStorage.getItem('SelectedDate');
+				console.log("SelectedDate: " + SelectedDate);
+				if(SelectedDate == null || SelectedDate == "")
+				{
+					console.log("Set DateSelect to today");
+  				var today = new Date();
+  				var Month = today.getMonth() + 1;
+  				if(Month / 10 < 1)
+  					Month = '0' + Month;
+  				var Day = today.getDate();
+  				if(Day / 10 < 1)
+  					Day = '0' + Day;
+					var date = today.getFullYear() + '-' + Month + '-' + Day;
+					console.log("today: " + date);
+					document.getElementById('DateSelect').value = date;
+					sessionStorage.setItem('SelectedDate', date);
+				}
+				else
+				{
+					console.log("Set SelectedDate");
+					document.getElementById('DateSelect').value = SelectedDate;
+				}
+				var SelectedViewTypeIndex =	sessionStorage.getItem('SelectedViewTypeIndex');
+				console.log("SelectedViewTypeIndex: " + SelectedViewTypeIndex);
+				if(SelectedViewTypeIndex == null)
+				{
+					ViewTypeIndex	= 0;
+				}
+				else
+				{
+					var select = document.getElementById('ViewType');
+					select.getElementsByTagName('option')[SelectedViewTypeIndex].selected = 'selected';		
+					ViewTypeIndex = SelectedViewTypeIndex;
+				}
+				console.log("ViewTypeIndex 2: " + ViewTypeIndex);
+			}
+			
+			function DateStringConvert(timestamp)
+			{
+				var date = new Date(timestamp * 1000);
+				var ThisYear = date.getFullYear();
+				//console.log("ThisYear + " + ThisYear);
+				var ThisMons = date.getMonth() + 1;
+				if(ThisMons < 10)
+					ThisMons = '0' + ThisMons;
+				var ThisDate = date.getDate();
+				if(ThisDate < 10)
+					ThisDate = '0' + ThisDate;
+				var ThisHour = date.getHours();
+				if(ThisHour < 10)
+						ThisHour = '0' + ThisHour;
+				var ThisMins = date.getMinutes();
+					if(ThisMins < 10)
+						ThisMins = '0' + ThisMins;							
+				var ThisSec = date.getSeconds();
+					if(ThisSec < 10)
+						ThisSec = '0' + ThisSec;
+					
+				var DateString = date.getFullYear() + '/' + ThisMons + '/' + ThisDate + ' ' + ThisHour + ':' + ThisMins + ':' + ThisSec;
+				return DateString;
+			}
+			
+	  	function createTable()
+	  	{
+				var tableNode; 
+				GetCallRecordInfo(StartUTC, EndUTC);
+				CallRecordInfo = sessionStorage.getItem("CallRecordInfo");
+				//console.log(CallRecordInfo);
+				var CallRecords = JSON.parse(CallRecordInfo);
+				var Numbers = CallRecords.numbers;
+				//console.log("Numbers = " + Numbers);
+	  		for(let i = 0; i < Numbers; i++)
+	  		{
+	  			//console.log("Data = " + CallRecords.data[i]);
+	  			var OneCallRecord = CallRecords.data[i];
+					tableNode = document.getElementById("work_table");
+					var trNode = tableNode.insertRow();
+					
+					var DBIndex = OneCallRecord[0];
+					var tdDBIndex = trNode.insertCell(); 
+					tdDBIndex.innerHTML = DBIndex;	  		
+
+					var CallType = OneCallRecord[3];
+					var tdCallType = trNode.insertCell(); 
+					if(CallType == 0)
+						tdCallType.innerHTML = '外線撥入';	  		
+					else if(CallType == 1)
+						tdCallType.innerHTML = '外線撥出';	  		
+					else if(CallType == 2)
+						tdCallType.innerHTML = '內線互撥';	  		
+
+					var StartTime = OneCallRecord[4];
+					var StartTimeString = DateStringConvert(StartTime);
+					//console.log("DateString = " + DateString);
+					var tdStartTime = trNode.insertCell(); 
+					tdStartTime.innerHTML = StartTimeString;
+
+					var ConnectionTime = OneCallRecord[5];
+					//console.log("ConnectionTime = " + ConnectionTime);
+					if(ConnectionTime == 0 || ConnectionTime == null)
+						var ConnectionTimeString = '0';
+					else
+						var ConnectionTimeString = DateStringConvert(ConnectionTime);
+					var tdConnectionTime = trNode.insertCell(); 
+					tdConnectionTime.innerHTML = ConnectionTimeString;	  		
+
+					var EndTime = OneCallRecord[6];
+					if(EndTime == 0 || EndTime == null)
+						var EndTimeString = '0';
+					else
+						var EndTimeString = DateStringConvert(EndTime);
+					var tdConnectionTime = trNode.insertCell(); 
+					tdConnectionTime.innerHTML = EndTimeString;	  		
+
+					var Duration = OneCallRecord[7];
+					if(Duration == null)
+						Duration = 0;
+					var tdConnectionTime = trNode.insertCell(); 
+					tdConnectionTime.innerHTML = Duration + ' 秒';	  		
+
+					var FileName = OneCallRecord[15];
+					if(FileName == null)
+						FileName = "";
+					var tdConnectionTime = trNode.insertCell(); 
+					tdConnectionTime.innerHTML = FileName;	  		
+
+					var RingTimes = OneCallRecord[11];
+					if(RingTimes == null)
+						RingTimes = 0;
+					var tdConnectionTime = trNode.insertCell(); 
+					tdConnectionTime.innerHTML = '響' + RingTimes + ' 次';	  		
+
+					var MachineID = OneCallRecord[8];
+					var tdConnectionTime = trNode.insertCell(); 
+					tdConnectionTime.innerHTML = MachineID;	  		
+
+					var OutVPort = OneCallRecord[1];
+					var tdConnectionTime = trNode.insertCell(); 
+					if(CallType == 2)
+						tdConnectionTime.innerHTML = '';	  		
+					else
+						tdConnectionTime.innerHTML = '埠 ' + OutVPort;	  		
+						
+					var OutPhyPort = OneCallRecord[10];
+					var tdConnectionTime = trNode.insertCell(); 
+					if(CallType == 2)
+						tdConnectionTime.innerHTML = '';	  		
+					else
+						tdConnectionTime.innerHTML = '埠 ' + OutPhyPort;	  		
+
+					var TelNo = OneCallRecord[9];
+					var tdConnectionTime = trNode.insertCell(); 
+					if(CallType == 2)
+						tdConnectionTime.innerHTML = '';	  		
+					else
+						tdConnectionTime.innerHTML = TelNo;	  		
+
+					var ExtNum = OneCallRecord[2];
+					var tdConnectionTime = trNode.insertCell(); 
+					if(CallType == 2)
+						tdConnectionTime.innerHTML = '';	  		
+					else
+						tdConnectionTime.innerHTML = ExtNum;	  		
+
+					var InterFromExtNum = OneCallRecord[12];
+					var tdConnectionTime = trNode.insertCell(); 
+					tdConnectionTime.innerHTML = InterFromExtNum;	  		
+
+					var InterToExtNum = OneCallRecord[13];
+					var tdConnectionTime = trNode.insertCell(); 
+					tdConnectionTime.innerHTML = InterToExtNum;	  		
+
+					document.getElementById("div1").appendChild(tableNode);
+				}
+			}
+			
+		</script>
+	</head>
+	<body>
+		<div>
+			<label for="Date">選擇日期: </label>
+			<input type="date" id="DateSelect" name="DateSelect" onchange=ChangeViewType()>
+			<select id="ViewType" onchange=ChangeViewType()>
+				<option>本日</option>
+				<option>本周</option>
+				<option>本月</option>
+				<option>本年</option>
+			</select>
+			<p3></p3>
+			<script type="text/javascript">Setdefault()</script>
+			<script type="text/javascript">LoadData(0)</script>
+		</div>
+		<table border="1" id="work_table">
+  		<colgroup>
+	    	<col span="15" style="background-color:rgb(220 220 220);">
+  		</colgroup>
+  		<tr>
+    		<th width=100>資料庫索引</th>
+    		<th width=100>通話類型</th>
+    		<th width=150>開始時間</th>
+    		<th width=150>接通時間</th>
+    		<th width=150>結束時間</th>
+    		<th width=100>通話時間</th>
+    		<th width=100>錄音檔名</th>
+    		<th width=100>振鈴次數</th>
+    		<th width=50>子機碼</th>
+    		<th width=100>虛擬外線</th>
+    		<th width=100>實體外線</th>
+    		<th width=100>來/去電號碼</th>
+    		<th width=100>分機號碼</th>
+    		<th width=100>內部通話去分機號碼</th>
+    		<th width=100>內部通話來分機號碼</th>
+  		</tr>
+		</table>
+		<div id="div1"></div>
+		<script type="text/javascript">createTable();</script>		
+	</body>
+</html>

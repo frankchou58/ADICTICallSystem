@@ -1,0 +1,62 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<title>設定客服員分機號碼頁面</title>
+		<meta charset="utf-8" />
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script type="text/javascript" src="scripts/main.js"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			var ThisEmployeeID;
+			var ThisExtNum;
+			
+			function SetExtNnmResponse()
+			{
+				const $result = $("#result");
+  			if(this.readyState === XMLHttpRequest.DONE && this.status === 200)
+  			{
+  				console.log(this.responseText);
+  				var Response = JSON.parse(this.responseText);
+			
+					if(Response.status == false)
+					{
+						$result.text('失敗:' + Response.message);
+						$result.css("color", "rgb(166 166 23)");
+					}
+					else
+					{
+						$result.text('成功設定分機號碼' + ThisExtNum + '到您的工號:' + ThisEmployeeID);
+						$result.css("color", "rgb(22 45 171)");
+					}
+				}
+			}
+			
+			function Setting()
+			{
+			 	ThisEmployeeID = document.getElementById("YourEmployeeID").value;
+				console.log("Your Employee ID: " + ThisEmployeeID);
+				if(ThisEmployeeID == "")
+				{
+					const $result = $("#result");
+					$result.text("請輸入您的工號");
+					$result.css("color", "rgb(166 166 23)");
+				}
+				else
+				{
+		    	var sPageURL = window.location.search.substring(1);
+					var ExtNumber = sPageURL.split("=");
+					ThisExtNum = ExtNumber[1];
+					console.log("ThisExtNum: " + ThisExtNum);
+					SetExtNnm(ThisEmployeeID, ThisExtNum);
+    		}
+			}
+		</script>
+	</head>
+	<body>
+		<font size="30">請輸入您的工號後按下傳送</font>
+		<div class="form-example">
+			<INPUT TYPE=TEXT NAME="YourEmployeeID" id="YourEmployeeID" SIZE=20 VALUE=""><BR>
+			<input type="button" NAME="login" id="BtnSetting" value="傳送" onclick="Setting()">
+ 			<h3 id="result"></h3>
+		</div>
+	</body>	
+</html>

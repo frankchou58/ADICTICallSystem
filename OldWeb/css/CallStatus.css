@@ -1,0 +1,93 @@
+				.box {
+  				display: inline-block;
+					position: relative;				
+  				width: 156px;
+  				height: 174px;
+					border: 3px solid white;  				
+				}
+								
+				.title {
+  				display: inline-block;
+					position: absolute;				
+  				width: 156px;
+  				height: 20px;
+  				top: 0px;
+  				background: #0000b0;
+  				color: black;
+  				font-size: 20px;
+ 					text-align: center;
+				}
+				
+				.status {
+  				display: inline-block;
+					position: absolute;				
+  				width: 156px;
+  				height: 24px;
+  				color: black;
+  				font-size: 18px;
+   				background: #bbbbbb;
+   				top: 20px;
+ 					text-align: center;
+				}
+				.callid {
+  				display: inline-block;
+					position: absolute;				
+  				width: 156px;
+  				height: 24px;
+  				background: #bbbbbb;
+  				color: black;
+  				font-size: 18px;
+  				top: 44px;
+ 					text-align: center;
+				}
+				.extno {
+  				display: inline-block;
+					position: absolute;				
+  				width: 156px;
+  				height: 24px;
+  				top: 68px;
+  				background: #00bd30;
+  				color: black;
+  				font-size: 18px;
+ 					text-align: center;
+				}
+				.operator {
+  				display: inline-block;
+					position: absolute;				
+  				width: 156px;
+  				height: 24px;
+  				top: 92px;
+  				background: red;
+  				color: black;
+  				font-size: 18px;
+ 					text-align: center;
+				}
+				.address {
+  				display: inline-block;
+					position: absolute;				
+  				width: 156px;
+  				height: 58px;
+  				top: 116px;
+  				background: lightblue;
+  				color: black;
+  				font-size: 22px;
+ 					text-align: center;
+				}
+				.none {
+  				display: inline-block;
+					position: absolute;				
+  				width: 156px;
+  				height: 0px;
+  				top: 116px;
+  				//border: 2px solid white;
+  				background: lightblue;
+				}
+				.space {
+  				display: inline-block;
+					//position: relative;				
+  				width: 5px;
+  				height: 96px;
+  				margin: auto;
+  				//border: 2px solid white;
+  				background: white;
+				}

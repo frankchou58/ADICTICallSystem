@@ -1,0 +1,172 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<meta charset="utf-8" />
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script type="text/javascript" src="scripts/main.js"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			let MachineBitMask;
+			var OperatorName;
+			var OutPortNums = 0;
+			var m_MachineID = new Array(240);
+			var m_OutPhyPortNo = new Array(240);
+			var m_OutVPortNo = new Array(240);
+			let m_MachineIDIndex;
+			var tdOutVPort = new Array(240);
+			var tdMachineID = new Array(240);
+			var tdOutPort = new Array(240);
+			var tdCallStatus = new Array(240);
+			var tdCallType = new Array(240);
+			var tdTelNum = new Array(240);
+			var tdExtNum = new Array(240);
+			var ExtNum;
+			let ws;
+			
+			var WSRRL = GetWSURL();
+			console.log('WSRRL : ' + WSRRL);
+			ws = new WebSocket(WSRRL)
+ 			console.log('WebSocket Connecting')
+ 			
+ 			function PortList()
+ 			{
+ 	  		for(let i = 0; i < 240; i++)
+	  		{
+	  			if(m_MachineID[i] > 0)
+	  			{
+						tableNode = document.getElementById("work_table");
+						var trNode = tableNode.insertRow();
+						tdMachineID[i] = trNode.insertCell(); 
+						tdMachineID[i].innerHTML = m_MachineID[i];
+						tdOutPort[i] = trNode.insertCell(); 
+						tdOutPort[i].innerHTML = m_OutPhyPortNo[i];	  		
+						tdOutVPort[i] = trNode.insertCell(); 
+						tdOutVPort[i].innerHTML = m_OutVPortNo[i];	  		
+						tdCallStatus[i] = trNode.insertCell(); 
+						tdCallStatus[i].innerHTML = " ";
+						tdTelNum[i] = trNode.insertCell(); 
+						tdTelNum[i].innerHTML = " ";
+						tdExtNum[i] = trNode.insertCell(); 
+						tdExtNum[i].innerHTML = " ";
+						tdCallType[i] = trNode.insertCell(); 
+						tdCallType[i].innerHTML = " ";
+					}
+				}			
+ 			}
+ 			
+			//開啟後執行的動作，指定一個 function 會在連結 WebSocket 後執行
+			ws.onopen = () =>
+			{
+    		console.log('open connection')
+				//ExtNum = sessionStorage.getItem('ExtNum');
+    		//console.log('Extension Number: ' + ExtNum);
+				var OperatorKey = sessionStorage.getItem('OperatorKey');
+    		ws.send(OperatorKey);
+				const para = document.querySelector('p1');
+ 				para.textContent = "已連線";
+			}
+
+			//關閉後執行的動作，指定一個 function 會在連結中斷後執行
+			ws.onclose = () => {
+		    console.log('close connection')
+				const para = document.querySelector('p1');
+ 				para.textContent = "斷線";
+			}
+			
+			ws.onmessage = event => {
+    		console.log(event)
+	 			var Event = JSON.parse(event.data);
+    		//console.log(Event.data);
+    		
+    		var MachineID = Event.data[0];
+	 			var CallType = Event.data[1];
+	 			var CallStatus = Event.data[2];
+				var PhyPortNo = Event.data[3];
+				var VPortNo = Event.data[4];
+				var TelNum = Event.data[5];
+				var ExtNumData = Event.data[6];
+
+				console.log("ExtNum : " + ExtNum);
+    		if(ExtNum == ExtNumData && ExtNum != 0)
+    		{
+    			if((CallStatus == 3 && CallType == 0) || (CallStatus == 2 && CallType == 1))
+    			{
+						sessionStorage.setItem("Page", 3);
+						sessionStorage.setItem("TelNo", TelNum);				
+						top.location.href="index.html";			
+					}
+				}
+				
+				var StrCallType;
+				if(CallType == 0)
+					StrCallType = '外線撥入';
+				else if(CallType == 1)
+					StrCallType = '外線撥出';
+				else if(CallType == 2)
+					StrCallType = '內線互打';
+
+	 			var StrCallStatus;
+	 			if(CallStatus == 1)
+	 				StrCallStatus = "撥入";
+	 			else if(CallStatus == 2)
+	 				StrCallStatus = "撥出";
+	 			else if(CallStatus == 3)
+	 				StrCallStatus = "通話";
+	 			else if(CallStatus == 4)
+	 				StrCallStatus = "掛機";
+	 				
+	 				
+				const para = document.querySelector('p2');
+				para.textContent = StrCallType;
+				
+				tdCallStatus[VPortNo].innerHTML = StrCallStatus;
+				if(CallType == 4)
+					tdTelNum[VPortNo].innerHTML = "";
+				else
+					tdTelNum[VPortNo].innerHTML = TelNum;
+			
+				if(CallType == 4)
+					tdExtNum[VPortNo].innerHTML = "";
+				else
+					tdExtNum[VPortNo].innerHTML = ExtNumData;
+				tdCallType[VPortNo].innerHTML = StrCallType;
+				//para.textContent = event.data + 'Timestamp:' + event.timeStamp;
+				//para.textContent = event.data;
+			}
+			
+			ws.onerror = event => {
+    		console.log(event);
+	 			//var Event = JSON.parse(event);
+				//console.log("Event.type: " + Event.type);
+				const para = document.querySelector('p1');
+ 				para.textContent = "請檢察主機程式是否開啟";
+			}			
+			
+			function Disconnect()
+			{
+				ws.close();
+			}
+		</script>
+	</head>
+	<body>
+		<h1 id="Title1"></h1>
+		<h1 id="Title2"></h1>
+		<p1></p1><br>
+		<p2></p2><br>
+		<table border="1" id="work_table">
+  		<colgroup>
+	    	<col span="14" style="background-color:rgb(220 220 220);">
+  		</colgroup>
+  		<tr>
+    		<th width=100>子機碼</th>
+    		<th width=100>外線編號</th>
+    		<th width=100>虛擬外線編號</th>
+    		<th width=100>通話狀態</th>
+    		<th width=100>來/去電號碼</th>
+    		<th width=100>分機號碼</th>
+    		<th width=100>通話類型</th>
+  		</tr>
+		</table>
+		<input type="button" NAME="login" id="BtnLogin" value="離線" onclick="Disconnect()"/>
+		<script type="text/javascript">Connection()</script>
+	</body>	
+</html>

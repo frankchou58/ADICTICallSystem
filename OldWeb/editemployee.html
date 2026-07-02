@@ -1,0 +1,274 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<title>編輯使用者頁面</title>
+		<meta charset="utf-8" />
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js?3"></script>
+		<script type="text/javascript" src="scripts/main.js?5"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			var ThisEmployeeID;
+			var ThisUUID;
+			var OldMachineBitMasks;
+			var OldCorp;
+			var Oldname;
+			var OldExtNum;
+			var Response = 1;
+			
+			function SetRantDeviceOptionSelected(Value)
+			{
+				console.log("Rant Devices: " + Value);
+				var select = document.getElementById('rantdevices');
+				var Index = 0;
+				for(let i = 1; i < 100; i++)
+				{
+			    if(i == Value)
+			    	select.getElementsByTagName('option')[Index].selected = 'selected';
+			    Index++;
+				}
+			}
+
+			function SetRantBridgeOptionSelected(Value)
+			{
+				console.log("Rant Bridge: " + Value);
+				var select = document.getElementById('rantBridge');
+				var Index = 0;
+				for(let i = 0; i <= 50; i++)
+				{
+			    if(i == Value)
+			    	select.getElementsByTagName('option')[Index].selected = 'selected';
+			    Index++;
+				}
+			}
+
+			function SetRantPriceOptionSelected(Value)
+			{
+				console.log("Rant Price: " + Value);
+				var select = document.getElementById('rantPrice');
+				var Index = 0;
+				for(let i = 0.1; i < 10.0; i+=0.1)
+				{
+			    if(i == Value)
+			    	select.getElementsByTagName('option')[Index].selected = 'selected';
+			    Index++;
+				}
+			}
+
+			window.onload=function()
+			{ 
+				var EmployeeInfo = sessionStorage.getItem("EmployeeInfo");
+				console.log("EmployeeInfo : " + EmployeeInfo);
+				var split = EmployeeInfo.split(',');
+				//ThisUUID = split[2];
+				OldCorp = split[1];
+				Oldname = split[2];
+				OldMachineBitMasks = split[9];
+				OldExtNum = split[10];
+				var name = document.getElementById('name');
+				name.value = Oldname;
+				console.log("Oldname: " + Oldname);
+
+				var Corp = document.getElementById('Corp');
+				Corp.value = OldCorp;
+				console.log("OldCorp: " + OldCorp);
+
+				var ExtNum = document.getElementById('ExtNum');
+				ExtNum.value = OldExtNum;
+				console.log("OldMachineBitMasks: " + OldMachineBitMasks);
+			}			
+			
+			function validateEmail(email)
+			{
+  			const re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  			return re.test(email);
+			}
+			
+			function SaveEmpolyeeInfo()
+			{
+				var select = document.getElementById('AddAssignOption');
+				var AssignedNumbers = select.length;
+    		console.log("Assigned Numbers: " + AssignedNumbers);
+    		var MachineBitMasks = 0;
+				for(var i = 0; i < AssignedNumbers; i++)
+				{
+					var MachineIDIndex = select[i].value;
+					var Bit = 1 << MachineIDIndex;
+					var MachineBitMasks = Bit | MachineBitMasks;
+				}
+				if(OldMachineBitMasks != MachineBitMasks)
+				{
+					for(var i = 0; i < 10; i++)
+					{
+						var Bit = (1 << i) & MachineBitMasks;
+						if(Bit > 0)
+						{
+							SetEmployeeInfo("machinesign", i + 1);						
+						}
+						else
+						{						
+							SetEmployeeInfo("machineunsign", i + 1);						
+						}
+					}
+				}
+				
+				var name = document.getElementById('name');
+				var password = document.getElementById('password');
+				const $result = $("#result");
+				if(
+					name.value == ""
+					)
+				{
+					$result.text("所有欄位不能為空");
+					$result.css("color", "rgb(189 10 0)");
+					return false;
+				}				
+				
+				console.log("姓名: " + name.value);
+				var Changed = false;
+				if(Oldname != name.value)
+				{
+					SetEmployeeInfo("name", name.value);
+					Changed = true;
+				}
+				if(password.value != "")
+				{
+					SetEmployeeInfo("password", password.value);
+					Changed = true;
+				}
+				if(OldExtNum != ExtNum.value)
+				{
+					var ThisExtNum = ExtNum.value;
+					if(ExtNum.value == "")
+						ThisExtNum = '0';
+					SetEmployeeInfo("ExtNum", ThisExtNum);
+					Changed = true;
+				}
+				
+				sessionStorage.setItem("Page", 1);
+				sessionStorage.setItem("EditUser", false);
+				if(Response == 1)
+					top.location.href="index.html";				
+			}
+			
+    	function AssignOrUnassign(from, to)
+    	{
+        for (let i = 0; i < from.length; i++)
+        {
+            var srcOption = from.options[i];
+            if (srcOption.selected)
+            {
+                to.appendChild(srcOption);
+                i--;
+            }
+        }
+    	}			
+			
+    	function AddUnassignOption()
+    	{
+				var EmployeeInfo = sessionStorage.getItem("EmployeeInfo");
+				var split = EmployeeInfo.split(',');
+				ThisEmployeeID = split[0];
+				ThisUUID = split[2];
+				OldMachineBitMasks = split[9];
+				console.log("OldMachineBitMasks: " + OldMachineBitMasks);
+				var select = document.getElementById('AddUnassignOption');
+			
+				for(let i = 0; i < 10; i++)
+				{
+					var Bit = (1 << i) & OldMachineBitMasks;
+					console.log("Bit: " + Bit);
+					if(Bit == 0)
+					{
+			    	var opt = document.createElement('option');
+						opt.value = i;
+						var Index = i + 1;
+						opt.innerHTML = '子機碼' + Index;
+						select.appendChild(opt);
+					}
+	  		}
+    	}
+    	
+    	function AddAssignOption()
+    	{
+				console.log("OldMachineBitMasks: " + OldMachineBitMasks);
+				var select = document.getElementById('AddAssignOption');
+				
+				for(let i = 0; i < 10; i++)
+				{
+					var Bit = (1 << i) & OldMachineBitMasks;
+					console.log("Bit: " + Bit);
+					if(Bit > 0)
+					{
+				    	var opt = document.createElement('option');
+							opt.value = i;
+							var Index = i + 1;
+							opt.innerHTML = '子機碼' + Index;
+							select.appendChild(opt);
+					}
+				}
+    	}
+			
+			function Back()
+			{
+				sessionStorage.setItem("Page", 1);
+				sessionStorage.setItem("EditUser", false);
+				top.location.href="index.html";								
+			}
+		</script>
+	</head>
+	<body>
+		<h1>填妥下列表單資料,按下提交修改該使用者資料</h1>
+		<form action="" method="get" class="form-example">
+
+		<div class="form-example">
+			<label for="name">姓名: </label>
+			<input type="text" name="name" id="name" required>
+		</div>
+
+  		<div class="form-example">
+    		<label for="Corp">公司編號: </label>
+    		<input type="text" name="Corp" id="Corp" required>
+  		</div>
+  		<div class="form-example">
+    		<label for="password">密碼: </label>
+    		<input type="password" name="password" id="password" required>
+  		</div>
+  		<div class="form-example">
+    		<label for="ExtNum">配置分機: </label>
+    		<input type="text" name="ExtNum" id="ExtNum" required>
+  		</div>
+			<div style="font-size: 11pt;">
+  	  	左邊為未設定的子機碼;右邊為已設定的子機碼
+			</div>
+		</form>
+		<form name="frm">
+			<table>
+				<tr>
+        	<td>
+          	<select id=AddUnassignOption name="SrcSelect" size="6" style="font-size: 11pt; width: 160px; height: 160px"
+                multiple="multiple" ondblclick="AssignOrUnassign(document.frm.SrcSelect,document.frm.ObjSelect) ">
+							<script type="text/javascript">AddUnassignOption()</script>
+            </select>
+          </td>
+         	<td width="30px">
+          	<input align="left" type="button" value=" > " onclick="AssignOrUnassign(document.frm.SrcSelect,document.frm.ObjSelect) ">
+            <input align="left" type="button" value=" < " onclick="AssignOrUnassign(document.frm.ObjSelect,document.frm.SrcSelect) ">
+          </td>
+          <td>
+            <select id=AddAssignOption name="ObjSelect" size="6" style="font-size: 11pt; width: 160px; height: 160px"
+                multiple="multiple" ondblclick="AssignOrUnassign(document.frm.ObjSelect,document.frm.SrcSelect) ">
+							<script type="text/javascript">AddAssignOption()</script>
+            </select>
+         	</td>
+      	</tr>
+    	</table>
+  	</form>
+ 		<div class="form-example">
+			<form method="post" action="">
+   			<input type="button" value="提交" id="Save" onclick="SaveEmpolyeeInfo()"/>
+   			<input type="reset">
+   			<input type="button" value="返回" id="Return" onclick="Back()"/>
+   		</form>
+ 		<h3 id="result"></h3>
+ 		</div>
+	</body>	
+</html>

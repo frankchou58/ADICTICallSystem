@@ -1,0 +1,503 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<meta charset="utf-8" />
+		<script type="text/javascript" src="scripts/main.js"></script>
+   	<link href="css/editTable.css?1" rel="stylesheet"/>
+		<script type="text/javascript">
+			var IndexID;
+			var Name;
+			let RespType = 0;			
+			let ws;
+			let ExtNum;
+			let TelNo;
+		
+			var WSRRL = GetWSURL();
+			console.log('WSRRL : ' + WSRRL);
+			ws = new WebSocket(WSRRL)
+
+			ws.onopen = () =>
+			{
+    		console.log('open connection')
+				ExtNum = sessionStorage.getItem('ExtNum');
+				TelNo = sessionStorage.getItem('TelNo');
+    		console.log('Extension Number: ' + ExtNum);
+    		console.log('TelNo: ' + TelNo);
+				var OperatorKey = sessionStorage.getItem('OperatorKey');
+    		ws.send(OperatorKey);
+//    		ws.send("The base framing protocol is formally defined by the following ABNF[RFC5234]. It is important to note that the representation of this data is binary, not ASCII characters.  As such, a field with a length of 1 bit that takes values \%x0 / \%x1 is represented as a single bit whose value is 0 or 1, not a full byte (octet) that stands for the characters \"0\" or \"1\" in the ASCII encoding.  A field with a length of 4 bits with values between \%x0-F again is represented by 4 bits, again NOT by an ASCII character or full byte (octet) with these values.  [RFC5234] does not specify a character encoding: \"Rules resolve into a string of terminal values, sometimes called characters.  In ABNF, a character is merely a non-negative integer. In certain contexts, a specific mapping (encoding) of values into a") 
+//    		ws.send("The base framing protocol is formally defined by the following ABNF[RFC5234]. ") 
+				const para = document.querySelector('p1');
+ 				para.textContent = "已連線";
+			}
+
+			//關閉後執行的動作，指定一個 function 會在連結中斷後執行
+			ws.onclose = () => {
+		    console.log('close connection')
+				const para = document.querySelector('p1');
+ 				para.textContent = "斷線";
+				sessionStorage.setItem("Page", 1);
+				top.location.href="index.html";			
+			}
+			
+			ws.onmessage = event => {
+    		console.log(event)
+	 			var Event = JSON.parse(event.data);
+    		//console.log(Event.data);
+    		var MachineID = Event.data[0];
+	 			var CallType = Event.data[1];
+	 			var CallStatus = Event.data[2];
+				var PhyPortNo = Event.data[3];
+				var VPortNo = Event.data[4];
+				var TelNum = Event.data[5];
+				var ExtNumData = Event.data[6];
+    		
+    		if(ExtNum == ExtNumData && CallStatus == 4)
+    		{
+					sessionStorage.setItem("Page", 1);
+					top.location.href="index.html";			
+				}
+			}
+			
+			ws.onerror = event => {
+    		console.log(event);
+	 			//var Event = JSON.parse(event);
+				//console.log("Event.type: " + Event.type);
+				const para = document.querySelector('p2');
+ 				para.textContent = "請檢察主機程式是否開啟";
+				sessionStorage.setItem("Page", 1);
+				top.location.href="index.html";			
+			}			
+			
+			function Disconnect()
+			{
+				ws.close();
+			}
+
+			function GetCustomerInfoResponse()
+			{
+				var result = document.getElementById('result');
+				console.log(this.responseText);       	
+				if(this.readyState === XMLHttpRequest.DONE && this.status === 200)
+				{
+					var RespArray = JSON.parse(this.responseText);
+					if(RespArray.status == false)
+					{
+						Response = 0;
+						result.style.color = "red";
+						result.innerHTML = RespArray.message;	
+					}
+					else
+					{
+	 					console.log('RespArray.numbers:' + RespArray.numbers);
+						if(RespArray.numbers == 1)
+						{
+							var CustomerInfoArray = RespArray.data[0];
+							sessionStorage.setItem("CustomerInfo", CustomerInfoArray);
+						}
+						else
+						{
+							sessionStorage.setItem("CustomerInfo", "null");
+						}
+					}
+				}
+			}
+			
+			function CustomerInfoResponse()
+			{
+				var result = document.getElementById('result');
+				//console.log('Complete Added Customer');
+ 				//console.log(this.status);       	
+  			if(this.readyState === XMLHttpRequest.DONE && this.status === 200)
+  			{
+  				console.log(this.responseText);
+  				var Val;
+  				Val = JSON.parse(this.responseText);
+					console.log(Val.status);       	
+					sessionStorage.setItem('AddedCustomer', false);
+					if(Val.status == false)
+					{
+						result.style.color = "red";
+						if(Val.message == 23000)
+						{
+							result.innerHTML = '失敗: 客戶識別碼重複';
+						}
+						AddedCustomerResult = 0;
+					}
+					else if(Val.status == true)
+					{
+						result.style.color = "blue";
+						if(RespType == 1)
+							result.innerHTML = '成功新增新客戶' + Name;
+						else if(RespType == 2)
+							result.innerHTML = '成功修改客戶[' + Name + ']資料';
+						AddedCustomerResult = 1;
+					}
+				}
+			}
+			
+			function AddCustomer()
+			{
+				console.log('增加新客戶');
+				var CustomerID = document.getElementById('CustomerID');
+				var CustomerName = document.getElementById('CustomerName');
+				Name = CustomerName.value;
+				var CustomerGenderIndex = document.getElementById('CustomerGender').selectedIndex + 1;
+				var CustomerTelNo = document.getElementById('CustomerTelNo');
+				var CustomerCounty = document.getElementById('CustomerCounty');
+				var CustomerTownships = document.getElementById('CustomerTownships');
+				var CustomerAddress = document.getElementById('CustomerAddress');
+				var CustomerBirthday = document.getElementById('CustomerBirthday');
+
+				console.log('客戶編號: ' + CustomerID.value);
+				console.log('客戶姓名: ' + CustomerName.value);
+				console.log('客戶電話: ' + CustomerTelNo.value);
+				console.log('客戶聯絡地址: ' + CustomerCounty.value + CustomerTownships.value + CustomerAddress.value);
+				console.log('客戶生日: ' + CustomerBirthday.value);
+				console.log('客戶性別: ' + CustomerGenderIndex);
+				
+				RespType = 1;
+				var xmlHttp = new XMLHttpRequest();
+ 				var URL = BackEndURL + 'AddCustomer.php?CustomerId=' + CustomerID.value + '&Name=' + CustomerName.value + '&Gender=' + CustomerGenderIndex + 
+ 					'&TelNo=' + CustomerTelNo.value + '&County=' + CustomerCounty.value + '&Townships=' + CustomerTownships.value + '&Address=' + CustomerAddress.value + '&Birthday=' + CustomerBirthday.value;
+				console.log('URL = ' + URL);
+ 				xmlHttp.open( "GET", URL, false);
+ 				xmlHttp.onreadystatechange = CustomerInfoResponse;
+ 				xmlHttp.send();
+				
+			}
+
+			function EditCustomer()
+			{
+				console.log('修改客戶資料');
+				var CustomerGenderIndex = document.getElementById('CustomerGender').selectedIndex + 1;
+				var CustomerTelNo = document.getElementById('CustomerTelNo');
+				var CustomerCounty = document.getElementById('CustomerCounty');
+				var CustomerTownships = document.getElementById('CustomerTownships');
+				var CustomerAddress = document.getElementById('CustomerAddress');
+				var CustomerBirthday = document.getElementById('CustomerBirthday');
+				var CustomerBlackListIndex = document.getElementById('CustomerBlackList').selectedIndex;
+
+				console.log('客戶電話: ' + CustomerTelNo.value);
+				console.log('客戶聯絡地址: ' + CustomerCounty.value + CustomerTownships.value + CustomerAddress.value);
+				console.log('客戶生日: ' + CustomerBirthday.value);
+				console.log('客戶性別: ' + CustomerGenderIndex);
+				RespType = 2;
+				var xmlHttp = new XMLHttpRequest();
+  			URL = BackEndURL + 'SetCustomerInfo.php?ID=' + IndexID + '&Name=' + Name + '&Gender=' + CustomerGenderIndex + '&TelNo=' + 
+  					CustomerTelNo.value + '&County=' + CustomerCounty.value + '&Townships=' + CustomerTownships.value + '&Address=' + 
+  					CustomerAddress.value + '&Birthday=' + CustomerBirthday.value + '&InBlackList=' + CustomerBlackListIndex;
+				console.log('URL = ' + URL);
+ 				xmlHttp.open( "GET", URL, false);
+ 				xmlHttp.onreadystatechange = CustomerInfoResponse;
+ 				xmlHttp.send();				
+			}
+			
+			function GetCustomerInfo(TelNo)
+			{
+				var xmlHttp = new XMLHttpRequest();
+ 				var URL = BackEndURL + 'GetCustomerInfoByTelno.php?TelNo=' + TelNo;
+				console.log('URL = ' + URL);
+ 				xmlHttp.open( "GET", URL, false);
+ 				xmlHttp.onreadystatechange = GetCustomerInfoResponse;
+ 				xmlHttp.send();
+ 				
+　　　　let parent = document.getElementById("parent");
+
+				var CustomerInfoArray = sessionStorage.getItem("CustomerInfo");
+				//var CustomerInfoArray = "null";
+ 				console.log('Customer Info:' + CustomerInfoArray);
+　　　　var CustomerID = document.createElement("CustomerID");
+				var CustomerName = document.createElement("CustomerName");
+				var CustomerGender = document.createElement("CustomerGender");
+				var CustomerBirthday = document.createElement("CustomerBirthday");
+				var CustomerTelNo = document.createElement("CustomerTelNo");
+				var CustomerBlackList = document.createElement("CustomerBlackList");
+				var CustomerCounty = document.createElement("CustomerCounty");
+				var CustomerTownships = document.createElement("CustomerTownships");
+				var CustomerAddress = document.createElement("CustomerAddress");
+				var PushButton = document.createElement("PushButton");
+ 				if(CustomerInfoArray == "null")
+ 				{
+ 					var Message = document.createElement("Message");
+ 					parent.appendChild(Message);
+
+					var ret;
+					var label;
+					
+					label = document.createElement("message");
+					label.innerHTML = "此電話為新客戶,如果客戶有意願加入會員,請填妥以下資料後,按下[加入]按鈕";
+					Message.appendChild(label);
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					Message.appendChild(ret);
+					
+					//建立編號欄位
+					label = document.createElement("label");
+					label.innerHTML = "編號: ";
+					CustomerID.appendChild(label);
+					var input = document.createElement("input");
+					input.id = "CustomerID";
+					input.type = "text";
+					input.size = 10;
+					CustomerID.appendChild(input);
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerID.appendChild(ret);
+					
+					//建立姓名欄位
+					label = document.createElement("label");
+					label.innerHTML = '姓名: ';
+					CustomerName.appendChild(label);
+					input = document.createElement("input");
+					input.setAttribute("id", "CustomerName");
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "10");
+					CustomerName.appendChild(input);
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerName.appendChild(ret);
+					
+					//建立性別欄位
+					label = document.createElement("label");
+					label.innerHTML = '性別: ';
+					CustomerGender.appendChild(label);
+					var select = document.createElement("select");
+					select.setAttribute("id", "CustomerGender");
+					var opt = document.createElement('option');
+					opt.innerHTML = "男";
+					select.appendChild(opt);
+					opt = document.createElement('option');
+					opt.innerHTML = "女";
+					select.appendChild(opt);
+					CustomerGender.appendChild(select);
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerGender.appendChild(ret);
+					
+					//建立電話欄位
+					label = document.createElement("label");
+					label.innerHTML = '電話: ';
+					CustomerTelNo.appendChild(label);
+					input = document.createElement("input");
+					input.setAttribute("value", TelNo);
+					input.setAttribute("id", "CustomerTelNo");
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "10");
+					CustomerTelNo.appendChild(input);
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerTelNo.appendChild(ret);
+					
+					//建立聯絡地址欄位
+					label = document.createElement("label");
+					label.innerHTML = '聯絡地址: ';
+					CustomerCounty.appendChild(label);
+					input = document.createElement("input");
+					input.setAttribute("id", "CustomerCounty");
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "5");
+					CustomerCounty.appendChild(input);										
+					label = document.createElement("label");
+					label.innerHTML = '縣市';					
+					CustomerCounty.appendChild(label);
+					
+					input = document.createElement("input");
+					input.id = "CustomerTownships";
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "5");
+					CustomerTownships.appendChild(input);					
+					label = document.createElement("label");
+					label.innerHTML = '鄉鎮市區';
+					CustomerTownships.appendChild(label);
+					
+					input = document.createElement("input");
+					input.setAttribute("id", "CustomerAddress");
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "15");
+					CustomerAddress.appendChild(input);					
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerAddress.appendChild(ret);
+					
+					//建立生日欄位
+					label = document.createElement("label");
+					label.innerHTML = '生å: ';
+					CustomerBirthday.appendChild(label);
+					input = document.createElement("input");
+					input.setAttribute("id", "CustomerBirthday");
+					input.setAttribute("type", "date");
+					input.setAttribute("size", "5");
+					CustomerBirthday.appendChild(input);					
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerBirthday.appendChild(ret);
+
+					//建立加入按鈕
+					input = document.createElement("input");
+					input.setAttribute("id", "PushButton");
+					input.setAttribute("type", "button");
+					input.setAttribute("onclick", "AddCustomer()");
+					input.setAttribute("value", '加入');
+					PushButton.appendChild(input);				
+ 				}
+ 				else
+ 				{
+ 					var split = CustomerInfoArray.split(',');
+					IndexID = split[0];
+					Name = split[3];
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					
+					//建立編號欄位
+					label = document.createElement("label");
+					label.innerHTML = "編號: "  + split[1] + '<br>';
+					CustomerID.appendChild(label);
+					
+					//建立姓名欄位
+					label = document.createElement("label");
+					label.innerHTML = '姓名: ' + split[3] + '<br>';
+					CustomerName.appendChild(label);
+					
+					//建立性別欄位
+					label = document.createElement("label");
+					label.innerHTML = '性別: ';
+					CustomerGender.appendChild(label);
+					var select = document.createElement("select");
+					select.setAttribute("id", "CustomerGender");
+					var opt = document.createElement('option');
+					opt.innerHTML = "男";
+					select.appendChild(opt);
+					opt = document.createElement('option');
+					opt.innerHTML = "女";
+					select.appendChild(opt);
+					CustomerGender.selectedIndex = split[4] - 1;
+					CustomerGender.appendChild(select);					
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerGender.appendChild(ret);
+					
+					//建立電話欄位
+					label = document.createElement("label");
+					label.innerHTML = '電話: ';
+					CustomerTelNo.appendChild(label);
+					input = document.createElement("input");
+					input.setAttribute("value", TelNo);
+					input.setAttribute("id", "CustomerTelNo");
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "10");
+					CustomerTelNo.appendChild(input);
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerTelNo.appendChild(ret);
+					
+					//建立聯絡地址欄位
+					label = document.createElement("label");
+					label.innerHTML = '聯絡地址: ';
+					CustomerCounty.appendChild(label);
+					input = document.createElement("input");
+					input.setAttribute("value", split[6]);
+					input.setAttribute("id", "CustomerCounty");
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "5");
+					CustomerCounty.appendChild(input);										
+					label = document.createElement("label");
+					label.innerHTML = '縣市';					
+					CustomerCounty.appendChild(label);
+					
+					input = document.createElement("input");
+					input.id = "CustomerTownships";
+					input.setAttribute("value", split[7]);
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "5");
+					CustomerTownships.appendChild(input);					
+					label = document.createElement("label");
+					label.innerHTML = '鄉鎮市區';
+					CustomerTownships.appendChild(label);
+					
+					input = document.createElement("input");
+					input.setAttribute("id", "CustomerAddress");
+					input.setAttribute("value", split[8]);
+					input.setAttribute("type", "text");
+					input.setAttribute("size", "15");
+					CustomerAddress.appendChild(input);					
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerAddress.appendChild(ret);
+					
+					//建立生日欄位
+					label = document.createElement("label");
+					label.innerHTML = '生日: ';
+					CustomerBirthday.appendChild(label);
+					input = document.createElement("input");
+					input.setAttribute("value", split[9]);
+					input.setAttribute("id", "CustomerBirthday");
+					input.setAttribute("type", "date");
+					input.setAttribute("size", "5");
+					CustomerBirthday.appendChild(input);					
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerBirthday.appendChild(ret);
+
+					//建立黑名單欄位
+					label = document.createElement("label");
+					label.innerHTML = '在黑名單中: ';
+					CustomerBlackList.appendChild(label);
+					var select = document.createElement("select");
+					select.setAttribute("id", "CustomerBlackList");
+					var opt = document.createElement('option');
+					opt.innerHTML = "否";
+					select.appendChild(opt);
+					opt = document.createElement('option');
+					opt.innerHTML = "是";
+					select.appendChild(opt);
+					CustomerBlackList.selectedIndex = split[9];
+					CustomerBlackList.appendChild(select);					
+					ret = document.createElement("label");
+					ret.innerHTML = "<br>";
+					CustomerBlackList.appendChild(ret);
+					parent.appendChild(CustomerBlackList);
+
+					//建立加入按鈕
+					input = document.createElement("input");
+					input.setAttribute("id", "PushButton");
+					input.setAttribute("type", "button");
+					input.setAttribute("onclick", "EditCustomer()");
+					input.setAttribute("value", '修改');
+					PushButton.appendChild(input);				
+				}
+				parent.appendChild(CustomerID);
+				parent.appendChild(CustomerName);
+				parent.appendChild(CustomerTelNo);
+				parent.appendChild(CustomerCounty);
+				parent.appendChild(CustomerTownships);
+				parent.appendChild(CustomerAddress);
+				parent.appendChild(CustomerGender);
+				parent.appendChild(CustomerBlackList);
+				parent.appendChild(CustomerBirthday);
+				parent.appendChild(PushButton);
+			}
+
+			window.onload=function()
+			{
+				var TelNo = sessionStorage.getItem('TelNo');
+				console.log("TelNo: " + TelNo);
+				const para = document.querySelector('p2');
+				para.textContent = '顯示電話' + TelNo + '的客戶資料';
+				GetCustomerInfo(TelNo);
+			}			
+			function Return()
+			{
+					sessionStorage.setItem("Page", 1);				
+					top.location.href="index.html";	
+			}
+			
+		</script>
+	</head>
+	<body>		
+		<p1></p1><br>
+		<p2></p2><br>
+		<div id="parent"></div>
+		<input type="button" NAME="Return" id="Return" value="返回" onclick="Return()"/>
+ 		<br><message id="result"></message>
+	</body>	
+</html>

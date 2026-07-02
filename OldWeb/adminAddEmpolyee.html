@@ -1,0 +1,174 @@
+﻿<!DOCTYPE HTML><html lang='zh_TW'>
+	<head>
+		<title>新增員工資料頁面</title>
+		<meta charset="utf-8" />
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+		<script type="text/javascript" src="scripts/main.js?1"></script>
+   	<link href="css/editTable.css" rel="stylesheet"/>
+		<script type="text/javascript">
+			var AddedEmployeeResult;
+			var ThisUUID;
+			
+			function AddRantDeviceOption()
+			{
+				var select = document.getElementById('rantdevices');
+				for(let i = 1; i < 100; i++)
+				{
+			    var opt = document.createElement('option');
+    			opt.value = i;
+    			opt.innerHTML = i;
+					select.appendChild(opt);
+				}
+			}
+			function AddRantBridgeOption()
+			{
+				var select = document.getElementById('rantBridge');
+				for(let i = 0; i <= 50; i++)
+				{
+			    var opt = document.createElement('option');
+    			opt.value = i;
+    			opt.innerHTML = i;
+					select.appendChild(opt);
+				}
+			}
+			function AddRantPriceOption()
+			{
+				var select = document.getElementById('rantPrice');
+				for(let i = 0.1; i < 10.0; i+=0.1)
+				{
+			    var opt = document.createElement('option');
+    			opt.value = i.toFixed(2);
+    			opt.innerHTML = i.toFixed(2);
+					select.appendChild(opt);
+				}
+			}
+			function validateEmail(email)
+			{
+  			const re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+  			return re.test(email);
+			}
+			
+			function SetEmployeeInfoResponse()
+			{
+ 				console.log(this.responseText);       	
+  			if(this.readyState === XMLHttpRequest.DONE && this.status === 200)
+  			{
+				}
+			}
+			
+			function SetEmployeeInfo(type, Value)
+			{
+ 				var Url;
+				if(type == "name")
+					Url = BackEndURL + 'SetOperatorName.php?Key=' + ThisUUID + '&Name=' + Value;
+				console.log("URL: " + Url);
+				var xmlHttp = new XMLHttpRequest();
+ 				xmlHttp.open( "GET", Url, false);
+ 				xmlHttp.onreadystatechange = SetEmployeeInfoResponse;
+ 				xmlHttp.send();
+			}
+
+			function AddedEmployeeResponse()
+			{
+				const $result = $("#result");
+				console.log('Complete Added User');
+ 				console.log(this.status);       	
+  			if(this.readyState === XMLHttpRequest.DONE && this.status === 200)
+  			{
+  				console.log(this.responseText);
+  				var Val;
+  				Val = JSON.parse(this.responseText);
+				
+					sessionStorage.setItem('AddedUser', false);
+					if(Val.status == false)
+					{
+						if(Val.message == 23000)
+						{
+							$result.text('失敗: 員工識別碼重複');
+						}
+						$result.css("color", "rgb(189 10 0)");
+						AddedEmployeeResult = 0;
+					}
+					else if(Val.status == true)
+					{
+						$result.text = ('成功' + Val.message);
+						AddedEmployeeResult = 1;
+						ThisUUID = Val.UUID;
+					}
+				}
+			}
+			
+			function AddedEmployee()
+			{
+				var employeeid = document.getElementById('employeeid');
+				var password = document.getElementById('password');
+				var repassword = document.getElementById('repassword');
+				var name = document.getElementById('name');
+
+				const $result = $("#result");
+				if(
+					employeeid.value == "" || password.value == "" || name.value == ""
+					)
+				{
+					$result.text("所有欄位不能為空");
+					$result.css("color", "rgb(189 10 0)");
+					return false;
+				}
+				
+				if(repassword.value != password.value)
+				{
+					$result.text("密碼不相同");
+					$result.css("color", "rgb(189 10 0)");
+					return false;
+				}
+	
+				console.log("帳號: " + employeeid.value);
+				console.log("密碼: " + password.value);
+				console.log("姓名: " + name.value);
+				var xmlHttp = new XMLHttpRequest();
+ 				var URL = BackEndURL + 'AddOperator.php?EmployeeId=' + employeeid.value + '&Password=' + password.value;
+				console.log('URL = ' + URL);
+ 				xmlHttp.open( "GET", URL, false);
+ 				xmlHttp.onreadystatechange = AddedEmployeeResponse;
+ 				xmlHttp.send();
+ 				
+ 				//console.log("ThisUUID: " + ThisUUID);
+ 				if(AddedEmployeeResult == 1)
+ 				{
+					SetEmployeeInfo("name", name.value);
+					sessionStorage.setItem("Page", 1);
+					top.location.href="index.html";			
+				}
+			}
+			
+		</script>
+	</head>
+	<body">
+		<h1>填妥下列表單資料,按下提交新增一位員工資料</h1>
+		<form action="" method="get" class="form-example">
+  		<div class="form-example">
+    		<label for="employeeid">員工識別碼: </label>
+    		<input type="employeeid" name="employeeid" id="employeeid" required>
+  		</div>
+  		<div class="form-example">
+    		<label for="password">密碼: </label>
+    		<input type="password" name="password" id="password" required>
+  		</div>
+  		<div class="form-example">
+    		<label for="repassword">再輸入相同密碼: </label>
+    		<input type="password" name="repassword" id="repassword" required>
+  		</div>
+  		<div class="form-example">
+    		<label for="name">姓名: </label>
+    		<input type="text" name="name" id="name" required>
+  		</div>
+  		<div class="form-example">
+				<form method="post" action="">
+    			<input type="button" value="提交" id="addedEmployee" onclick="AddedEmployee()"/>
+    			<input type="reset">
+    		</form>
+  		<h3 id="result"></h3>
+  		</div>
+		</form>
+	</body>	
+</html>
