@@ -11,6 +11,14 @@
 
 在原本 5 個分頁之後多加一個「網頁版控制台」分頁，用 WebView2 內嵌顯示 `ADICTICallCenter.Web`（預設 `http://localhost:8842`，可用登錄檔 `SystemSetting\WebConsoleURL` 覆寫），純粹多一個入口，不取代任何既有分頁/功能。新增檔案：`CWebConsoleDlg.h`/`.cpp`，`third_party/WebView2/`（手動下載解壓的 WebView2 SDK nupkg，未走 NuGet 還原，因為這個舊式 vcxproj 沒有配置 NuGet restore）。
 
+⚠️ **每個人新 clone 這個 repo 之後，第一次建置都會在 `CWebConsoleDlg.h` 卡 `C1083: 無法開啟包含檔案: 'WebView2.h'`**——這是預期中的狀況，不是壞掉。`third_party/WebView2/` 底下只有 `.nuspec`/`.idl`/`.tlb`/`LICENSE.txt` 這幾個中繼資料檔有進版控，實際的標頭檔（`build/native/include/WebView2.h`）、函式庫（`build/native/x64/WebView2LoaderStatic.lib`）因為是 Microsoft 授權的二進位檔，被 `.gitignore` 排除，不會隨 `git clone` 一起下來。
+
+**解法**：在 `third_party/` 資料夾底下執行一次：
+```powershell
+.\Fetch-WebView2Sdk.ps1
+```
+（`ADICTICallCenter/ADICTICallCenter/third_party/Fetch-WebView2Sdk.ps1`）這支腳本會讀 `third_party/WebView2/Microsoft.Web.WebView2.nuspec` 裡記載的版本號，從 nuget.org 下載對應的 nupkg 並解壓對齊到 `third_party/WebView2/build|lib|lib_manual|runtimes|tools`，執行一次即可，重複執行會偵測到 `WebView2.h` 已存在而跳過。跑完之後重新建置就不會再缺檔。這台機器需要能連上 `api.nuget.org`；如果環境完全沒有對外網路，改成從另一台已經跑過這支腳本的機器，直接把整個 `third_party/WebView2/build/`（連同 `lib/`、`runtimes/`）資料夾複製過去也一樣。
+
 ⚠️ **關鍵坑：這個 App 從來沒有初始化過 COM**。`AfxEnableControlContainer()` 不會幫你呼叫 `CoInitialize`/`OleInitialize`，WebView2 的 `CreateCoreWebView2EnvironmentWithOptions` 需要呼叫端執行緒已經是 COM STA，沒有這行的話，環境建立會直接失敗，而且是**完全沒有錯誤訊息的靜默失敗**——分頁看起來就是一片空白，跟正常運作時的視覺效果沒有明顯差異，很難第一時間判斷是「還沒載入完」還是「根本沒在動」。已在 `ADICTICallCenter.cpp` 的 `InitInstance()` 最前面加上 `CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);` 解決。`CWebConsoleDlg` 另外加了一個狀態文字（載入中/實際 HRESULT/`WebErrorStatus`），之後再遇到類似問題至少畫面上看得出卡在哪一步，不會又是一片空白。
 
 ## 2026-07-01 更新：虛擬線路 API 改版（outline_ports/extline_ports）
