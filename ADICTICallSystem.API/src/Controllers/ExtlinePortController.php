@@ -85,10 +85,6 @@ class ExtlinePortController extends Controller
     /** PATCH /extline-ports/{id}  { vport?, extNum?, status? } */
     public function update(Request $request): void
     {
-        if (!$this->requireRole($request, ['admin', 'supervisor'])) {
-            return;
-        }
-
         $id = (int) $request->params['id'];
         $fields = [];
         $params = ['id' => $id];

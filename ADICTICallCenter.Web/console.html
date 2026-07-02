@@ -9,10 +9,6 @@
 <body>
   <div class="topbar">
     <div class="title"><img src="ADICTI.jpg" alt="ADICTI" class="topbar-logo" />ADICTI 電話中心監控台</div>
-    <div style="display:flex; align-items:center; gap:14px;">
-      <span class="who" id="whoAmI"></span>
-      <button id="logoutBtn">登出</button>
-    </div>
   </div>
 
   <div class="tabs">
@@ -78,41 +74,11 @@
     </div>
     <button class="primary" style="width:auto; padding:8px 20px;" id="saveSettingsBtn">儲存</button>
     <p class="hint" style="margin-top:16px;">「電話號碼決定優先」設定目前只存在於 MFC 主核心程式的登錄檔，新版 API 尚未提供對應端點，暫時無法在這裡設定。</p>
-
-    <div class="section-title" style="margin-top:30px;">變更密碼</div>
-    <div class="field" style="max-width:400px;">
-      <label>目前密碼</label>
-      <input type="password" id="currentPasswordInput" autocomplete="current-password" />
-    </div>
-    <div class="field" style="max-width:400px;">
-      <label>新密碼</label>
-      <input type="password" id="newPasswordInput" autocomplete="new-password" />
-    </div>
-    <div class="field" style="max-width:400px;">
-      <label>確認新密碼</label>
-      <input type="password" id="confirmPasswordInput" autocomplete="new-password" />
-    </div>
-    <button class="primary" style="width:auto; padding:8px 20px;" id="changePasswordBtn">變更密碼</button>
-    <div class="error-msg" id="changePasswordMsg"></div>
   </div>
 
   <script src="js/api-client.js"></script>
   <script src="js/ui.js"></script>
   <script>
-    if (!Api.isLoggedIn()) {
-      window.location.href = 'login.html';
-    }
-    const employee = JSON.parse(sessionStorage.getItem('adicti.employee') || 'null');
-    if (employee) {
-      document.getElementById('whoAmI').textContent = `${employee.name || employee.employeeNo}（${employee.role}）`;
-    }
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      try { await Api.post('/auth/logout'); } catch (e) { /* 忽略登出失敗，仍清除本機 token */ }
-      Api.setToken(null);
-      sessionStorage.removeItem('adicti.employee');
-      window.location.href = 'login.html';
-    });
-
     // 分頁切換
     const tabButtons = document.querySelectorAll('.tab-btn');
     const tabPanels = document.querySelectorAll('.tab-panel');

@@ -65,10 +65,6 @@ class OutlinePortController extends Controller
     /** PATCH /outline-ports/{id}  { vport?, inUse?, callStatus? } */
     public function update(Request $request): void
     {
-        if (!$this->requireRole($request, ['admin', 'supervisor'])) {
-            return;
-        }
-
         $id = (int) $request->params['id'];
         $fields = [];
         $params = ['id' => $id];

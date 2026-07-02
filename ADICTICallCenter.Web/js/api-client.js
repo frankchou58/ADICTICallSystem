@@ -6,6 +6,10 @@
  * 詳見 doc/README.md「沒有 URL Rewrite 時的路由方式」。
  *
  * baseUrl 預設可在 settings 頁面覆寫，存在 localStorage。
+ *
+ * 2026-07-03：這個網站不再要求登入（見 doc/ADICTICallCenter.Web-說明.md），
+ * 呼叫的 /machines、/outline-ports、/extline-ports 這幾組端點後端也已經
+ * 拿掉 Bearer Token 驗證，所以這裡不再處理 token/登入相關邏輯。
  */
 const Api = (() => {
   // 用目前網頁本身的主機名稱組出預設 API 位址，而不是寫死 localhost：
@@ -14,7 +18,6 @@ const Api = (() => {
   // 跑 API 的那台主機，直接 "Failed to fetch"。API 站台預期跟這個網頁
   // 部署在同一台主機上，只差 port。
   const DEFAULT_BASE_URL = `http://${window.location.hostname}:8841/ADICTICallSystem.API/index.php`;
-  const TOKEN_KEY = 'adicti.token';
   const BASE_URL_KEY = 'adicti.baseUrl';
 
   function getBaseUrl() {
@@ -23,19 +26,6 @@ const Api = (() => {
 
   function setBaseUrl(url) {
     localStorage.setItem(BASE_URL_KEY, url);
-  }
-
-  function getToken() {
-    return localStorage.getItem(TOKEN_KEY);
-  }
-
-  function setToken(token) {
-    if (token) localStorage.setItem(TOKEN_KEY, token);
-    else localStorage.removeItem(TOKEN_KEY);
-  }
-
-  function isLoggedIn() {
-    return !!getToken();
   }
 
   /**
@@ -56,13 +46,9 @@ const Api = (() => {
       });
     }
 
-    const headers = { 'Content-Type': 'application/json' };
-    const token = getToken();
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
     const response = await fetch(`${getBaseUrl()}?${params.toString()}`, {
       method,
-      headers,
+      headers: { 'Content-Type': 'application/json' },
       body: options.body ? JSON.stringify(options.body) : undefined,
     });
 
@@ -71,13 +57,6 @@ const Api = (() => {
       json = await response.json();
     } catch (e) {
       throw new ApiError('伺服器回應不是有效的 JSON', response.status, null);
-    }
-
-    if (response.status === 401) {
-      setToken(null);
-      if (!route.startsWith('/auth/login')) {
-        window.location.href = 'login.html';
-      }
     }
 
     if (!json.success) {
@@ -98,9 +77,6 @@ const Api = (() => {
   return {
     getBaseUrl,
     setBaseUrl,
-    getToken,
-    setToken,
-    isLoggedIn,
     get: (route, query) => request('GET', route, { query }),
     post: (route, body) => request('POST', route, { body }),
     patch: (route, body) => request('PATCH', route, { body }),

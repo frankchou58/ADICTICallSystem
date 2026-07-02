@@ -68,10 +68,6 @@ class MachineController extends Controller
     /** PATCH /machines/{machineType}/{machineNo}  { alias?, outPortCount?, extPortCount?, isConnected?, ipAddress? } */
     public function update(Request $request): void
     {
-        if (!$this->requireRole($request, ['admin', 'supervisor'])) {
-            return;
-        }
-
         $machineType = (int) $request->params['machineType'];
         $machineNo = (int) $request->params['machineNo'];
 

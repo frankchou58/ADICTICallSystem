@@ -38,23 +38,27 @@ $router->get('/customers/{id}', [CustomerController::class, 'show'], [AuthMiddle
 $router->patch('/customers/{id}', [CustomerController::class, 'update'], [AuthMiddleware::class]);
 
 // ---- Machines (PBX / CallerID Box / Voice Card slots) ----------------------
-$router->get('/machines', [MachineController::class, 'index'], [AuthMiddleware::class]);
-$router->get('/machines/{machineType}/{machineNo}', [MachineController::class, 'show'], [AuthMiddleware::class]);
-$router->patch('/machines/{machineType}/{machineNo}', [MachineController::class, 'update'], [AuthMiddleware::class]);
+// 這五組（machines / outline-ports / extline-ports）刻意不掛 AuthMiddleware：
+// ADICTICallCenter.Web（網頁版控制台，port 8842）不再要求登入，這些是它
+// 唯一會呼叫的端點。employees/customers/call-records 不受影響，仍然要求
+// Bearer Token（OperatorWeb 的登入/座席身分辨識靠這幾組維持）。
+$router->get('/machines', [MachineController::class, 'index']);
+$router->get('/machines/{machineType}/{machineNo}', [MachineController::class, 'show']);
+$router->patch('/machines/{machineType}/{machineNo}', [MachineController::class, 'update']);
 
 // ---- Outline ports (one row per physical external-line port; vport is a
 //      plain column, not a fixed-size pool - see doc/README.md) -------------
-$router->get('/outline-ports', [OutlinePortController::class, 'index'], [AuthMiddleware::class]);
-$router->get('/outline-ports/by-vport/{vport}', [OutlinePortController::class, 'showByVport'], [AuthMiddleware::class]);
-$router->get('/outline-ports/{id}', [OutlinePortController::class, 'show'], [AuthMiddleware::class]);
-$router->patch('/outline-ports/{id}', [OutlinePortController::class, 'update'], [AuthMiddleware::class]);
+$router->get('/outline-ports', [OutlinePortController::class, 'index']);
+$router->get('/outline-ports/by-vport/{vport}', [OutlinePortController::class, 'showByVport']);
+$router->get('/outline-ports/{id}', [OutlinePortController::class, 'show']);
+$router->patch('/outline-ports/{id}', [OutlinePortController::class, 'update']);
 
 // ---- Extline ports (one row per physical internal-line port) --------------
-$router->get('/extline-ports', [ExtlinePortController::class, 'index'], [AuthMiddleware::class]);
-$router->get('/extline-ports/by-vport/{vport}', [ExtlinePortController::class, 'showByVport'], [AuthMiddleware::class]);
-$router->get('/extline-ports/by-ext-num/{machineType}/{machineNo}/{extNum}', [ExtlinePortController::class, 'showByExtNum'], [AuthMiddleware::class]);
-$router->get('/extline-ports/{id}', [ExtlinePortController::class, 'show'], [AuthMiddleware::class]);
-$router->patch('/extline-ports/{id}', [ExtlinePortController::class, 'update'], [AuthMiddleware::class]);
+$router->get('/extline-ports', [ExtlinePortController::class, 'index']);
+$router->get('/extline-ports/by-vport/{vport}', [ExtlinePortController::class, 'showByVport']);
+$router->get('/extline-ports/by-ext-num/{machineType}/{machineNo}/{extNum}', [ExtlinePortController::class, 'showByExtNum']);
+$router->get('/extline-ports/{id}', [ExtlinePortController::class, 'show']);
+$router->patch('/extline-ports/{id}', [ExtlinePortController::class, 'update']);
 
 // ---- Call records -----------------------------------------------------------
 $router->post('/call-records', [CallRecordController::class, 'create'], [AuthMiddleware::class]);
