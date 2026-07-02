@@ -1,0 +1,40 @@
+# ---- Build artifacts (Visual Studio / MSVC) ----
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+.vs/
+ipch/
+*.obj
+*.pdb
+*.ilk
+*.exe
+*.res
+*.tlog
+*.log
+*.aps
+*.sdf
+*.opensdf
+*.suo
+*.user
+
+# ---- Third-party SDK (manually downloaded, not vendored in git -
+#      see doc/ADICTICallCenter-MFC改版說明.md for how to re-fetch) ----
+ADICTICallCenter/ADICTICallCenter/third_party/WebView2/build/
+ADICTICallCenter/ADICTICallCenter/third_party/WebView2/lib/
+ADICTICallCenter/ADICTICallCenter/third_party/WebView2/lib_manual/
+ADICTICallCenter/ADICTICallCenter/third_party/WebView2/runtimes/
+ADICTICallCenter/ADICTICallCenter/third_party/WebView2/tools/
+
+# ---- Sensitive local config (real DB credentials - see config.local.php.example) ----
+ADICTICallSystem.API/config/config.local.php
+
+# ---- Runtime data, not source (real customer call recordings) ----
+OperatorWeb/20220103/
+
+# ---- OS / editor cruft ----
+Thumbs.db
+.DS_Store
+
+# ---- Claude Code session state (not project source) ----
+.claude/

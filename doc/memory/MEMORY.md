@@ -1,0 +1,3 @@
+- [Markdown docs location](feedback_markdown_docs_location.md) — all .md files go under ADICTICallSystem/doc/, not alongside code
+- [UTF-8 BOM for MFC files](feedback_utf8_bom_mfc_files.md) — new .h/.cpp with Chinese text in ADICTICallCenter needs a UTF-8 BOM or MSVC corrupts it
+- [pdo_odbc quirks](feedback_pdo_odbc_quirks.md) — 5 recurring PDO binding gotchas in ADICTICallSystem.API (Chinese text, mixed bind styles, null handling, repeated params, datetime format)

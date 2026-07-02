@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>ADICTI 電話中心監控台</title>
+</head>
+<body>
+  <script src="js/api-client.js"></script>
+  <script>
+    window.location.href = Api.isLoggedIn() ? 'console.html' : 'login.html';
+  </script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>ADICTI 電話中心座席系統 - 登入</title>
+<link rel="icon" href="ADICTI.jpg" type="image/jpeg" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-box">
+      <img src="ADICTI.jpg" alt="ADICTI" class="login-logo" />
+      <h1>ADICTI 電話中心座席系統</h1>
+      <div class="field">
+        <label>員工編號</label>
+        <select id="employeeNo" autocomplete="username">
+          <option value="">請選擇...</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>密碼</label>
+        <input type="password" id="password" autocomplete="current-password" />
+      </div>
+      <button class="primary" id="loginBtn">登入</button>
+      <div class="error-msg" id="errorMsg"></div>
+    </div>
+  </div>
+
+  <script src="js/api-client.js"></script>
+  <script src="js/ui.js"></script>
+  <script>
+    // 新版不再區分「管理者/使用者」兩種登入表單，統一用員工帳號登入，
+    // 畫面上看得到哪些分頁完全依 employee.role（operator/supervisor/admin）
+    // 決定，跟舊版靠使用者自己勾選「管理者」單選鈕不同（那種方式沒有
+    // 真正驗證身分，只要勾選就能看到管理員頁面）。
+    if (Api.isLoggedIn()) {
+      window.location.href = 'console.html';
+    }
+
+    const errorMsg = document.getElementById('errorMsg');
+
+    async function loadEmployeeNumbers() {
+      const select = document.getElementById('employeeNo');
+      try {
+        const employees = await Api.get('/auth/employee-numbers');
+        employees.forEach((emp) => {
+          const option = document.createElement('option');
+          option.value = emp.employeeNo;
+          option.textContent = emp.name ? `${emp.employeeNo}（${emp.name}）` : emp.employeeNo;
+          select.appendChild(option);
+        });
+      } catch (err) {
+        errorMsg.textContent = '無法載入員工編號清單：' + (err.message || '未知錯誤');
+      }
+    }
+    loadEmployeeNumbers();
+
+    async function doLogin() {
+      errorMsg.textContent = '';
+      const employeeNo = document.getElementById('employeeNo').value.trim();
+      const password = document.getElementById('password').value;
+      if (!employeeNo || !password) {
+        errorMsg.textContent = '請輸入員工編號與密碼';
+        return;
+      }
+      try {
+        const data = await Api.post('/auth/login', { employeeNo, password });
+        Api.setToken(data.token);
+        sessionStorage.setItem('adicti.operator.employee', JSON.stringify(data.employee));
+        window.location.href = 'console.html';
+      } catch (err) {
+        errorMsg.textContent = err.message || '登入失敗';
+      }
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', doLogin);
+    document.getElementById('password').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLogin();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+<?php
+/**
+ * Copy this file to config.local.php (kept out of version control) to
+ * override local settings without touching config.php. Anything returned
+ * here is deep-merged over the defaults.
+ */
+return [
+    'db' => [
+        // 'sqlsrv' if the pdo_sqlsrv extension is installed, otherwise 'odbc'
+        // to use pdo_odbc + a driver from `Get-OdbcDriver` (e.g. "ODBC Driver
+        // 18 for SQL Server" or the legacy built-in "SQL Server" driver).
+        'driver'           => 'sqlsrv',
+        'odbc_driver_name' => 'ODBC Driver 18 for SQL Server',
+        'host'             => 'localhost',
+        'database'         => 'ADICTICallSystem',
+        'user'             => 'sa',
+        'password'         => 'change-me',
+    ],
+];

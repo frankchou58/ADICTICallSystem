@@ -1,0 +1,501 @@
+{
+  "info": {
+    "name": "ADICTICallSystem.API",
+    "description": "電話中心系統 API（重寫版）。因為本機部署環境沒有 IIS URL Rewrite 模組，所有路徑都透過 ?route= 查詢參數呼叫，見 doc/README.md。登入後 Token 會自動存進 collection 變數 {{token}}，其餘請求皆自動帶入 Authorization Header。",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{token}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8841/ADICTICallSystem.API/index.php" },
+    { "key": "token", "value": "" },
+    { "key": "employeeId", "value": "1" },
+    { "key": "customerId", "value": "1" },
+    { "key": "machineType", "value": "1" },
+    { "key": "machineNo", "value": "1" },
+    { "key": "vport", "value": "1" },
+    { "key": "phyPort", "value": "1" },
+    { "key": "portId", "value": "1" },
+    { "key": "extNum", "value": "610" },
+    { "key": "callRecordId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "登入 Login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeNo\": \"admin\",\n  \"password\": \"AdminStr0ngPassw0rd!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/auth/login",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/auth/login" }]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// 登入成功後自動把 token 存進 collection 變數，之後所有請求會自動帶上",
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    if (body.success && body.data && body.data.token) {",
+                  "        pm.collectionVariables.set('token', body.data.token);",
+                  "        console.log('Token saved:', body.data.token);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "登出 Logout",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}?route=/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/auth/logout" }]
+            }
+          }
+        },
+        {
+          "name": "目前登入者 Me",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/auth/me",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/auth/me" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Employees",
+      "item": [
+        {
+          "name": "新增員工",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"employeeNo\": \"10001\",\n  \"password\": \"Str0ngPassw0rd!\",\n  \"name\": \"測試客服員\",\n  \"role\": \"operator\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/employees",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/employees" }]
+            }
+          }
+        },
+        {
+          "name": "列出員工",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/employees&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "query": [
+                { "key": "route", "value": "/employees" },
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "員工詳細資料",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/employees/{{employeeId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/employees/{{employeeId}}" }]
+            }
+          }
+        },
+        {
+          "name": "更新員工",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"新的姓名\",\n  \"extNum\": 610\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/employees/{{employeeId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/employees/{{employeeId}}" }]
+            }
+          }
+        },
+        {
+          "name": "變更密碼",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"AdminStr0ngPassw0rd!\",\n  \"newPassword\": \"NewStr0ngPassw0rd!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/employees/{{employeeId}}/password",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/employees/{{employeeId}}/password" }]
+            }
+          }
+        },
+        {
+          "name": "綁定機碼",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}?route=/employees/{{employeeId}}/machines/{{machineNo}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/employees/{{employeeId}}/machines/{{machineNo}}" }]
+            }
+          }
+        },
+        {
+          "name": "解除綁定機碼",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}?route=/employees/{{employeeId}}/machines/{{machineNo}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/employees/{{employeeId}}/machines/{{machineNo}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Customers",
+      "item": [
+        {
+          "name": "新增客戶",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"王小明\",\n  \"telNo\": \"0912345678\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/customers",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/customers" }]
+            }
+          }
+        },
+        {
+          "name": "搜尋客戶",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/customers&telNo=0912&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "query": [
+                { "key": "route", "value": "/customers" },
+                { "key": "telNo", "value": "0912" },
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "客戶詳細資料",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/customers/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/customers/{{customerId}}" }]
+            }
+          }
+        },
+        {
+          "name": "依電話查客戶",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/customers/by-tel/0912345678",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/customers/by-tel/0912345678" }]
+            }
+          }
+        },
+        {
+          "name": "更新客戶",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"台北市信義區...\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/customers/{{customerId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/customers/{{customerId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Machines",
+      "item": [
+        {
+          "name": "列出子機槽位",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/machines",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/machines" }]
+            }
+          }
+        },
+        {
+          "name": "子機槽位詳細資料",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/machines/{{machineType}}/{{machineNo}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/machines/{{machineType}}/{{machineNo}}" }]
+            }
+          }
+        },
+        {
+          "name": "更新子機設定",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"alias\": \"台北辦公室交換機\",\n  \"outPortCount\": 8,\n  \"extPortCount\": 16\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/machines/{{machineType}}/{{machineNo}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/machines/{{machineType}}/{{machineNo}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Outline Ports",
+      "item": [
+        {
+          "name": "列出實體外線埠（可用 machineType/machineNo/phyPort/vport 篩選）",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/outline-ports&machineType={{machineType}}&machineNo={{machineNo}}",
+              "host": ["{{baseUrl}}"],
+              "query": [
+                { "key": "route", "value": "/outline-ports" },
+                { "key": "machineType", "value": "{{machineType}}" },
+                { "key": "machineNo", "value": "{{machineNo}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "實體外線埠詳細資料",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/outline-ports/{{portId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/outline-ports/{{portId}}" }]
+            }
+          }
+        },
+        {
+          "name": "查同一虛擬編號下有哪些設備共用",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/outline-ports/by-vport/{{vport}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/outline-ports/by-vport/{{vport}}" }]
+            }
+          }
+        },
+        {
+          "name": "指派虛擬外線編號給這個實體埠",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vport\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/outline-ports/{{portId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/outline-ports/{{portId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Extline Ports",
+      "item": [
+        {
+          "name": "列出實體內線埠（可用 machineType/machineNo/phyPort/vport 篩選）",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/extline-ports&machineType={{machineType}}&machineNo={{machineNo}}",
+              "host": ["{{baseUrl}}"],
+              "query": [
+                { "key": "route", "value": "/extline-ports" },
+                { "key": "machineType", "value": "{{machineType}}" },
+                { "key": "machineNo", "value": "{{machineNo}}" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "實體內線埠詳細資料",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/extline-ports/{{portId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/extline-ports/{{portId}}" }]
+            }
+          }
+        },
+        {
+          "name": "查同一虛擬編號下有哪些設備共用",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/extline-ports/by-vport/{{vport}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/extline-ports/by-vport/{{vport}}" }]
+            }
+          }
+        },
+        {
+          "name": "依分機號碼查詢",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/extline-ports/by-ext-num/{{machineType}}/{{machineNo}}/{{extNum}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/extline-ports/by-ext-num/{{machineType}}/{{machineNo}}/{{extNum}}" }]
+            }
+          }
+        },
+        {
+          "name": "指派虛擬內線編號/分機號碼給這個實體埠",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vport\": 1,\n  \"extNum\": 610\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/extline-ports/{{portId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/extline-ports/{{portId}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Call Records",
+      "item": [
+        {
+          "name": "新增通聯記錄",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"machineNo\": 1,\n  \"callType\": 0,\n  \"outVport\": 1,\n  \"outPhyPort\": 1,\n  \"telNo\": \"0912345678\",\n  \"startTime\": \"2026-07-01T10:00:00Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/call-records",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/call-records" }]
+            }
+          }
+        },
+        {
+          "name": "搜尋通聯記錄",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/call-records&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "query": [
+                { "key": "route", "value": "/call-records" },
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "通聯記錄詳細資料",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}?route=/call-records/{{callRecordId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/call-records/{{callRecordId}}" }]
+            }
+          }
+        },
+        {
+          "name": "更新通聯記錄",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"endTime\": \"2026-07-01T10:05:00Z\",\n  \"durationSec\": 300,\n  \"ringTimes\": 3\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}?route=/call-records/{{callRecordId}}",
+              "host": ["{{baseUrl}}"],
+              "query": [{ "key": "route", "value": "/call-records/{{callRecordId}}" }]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

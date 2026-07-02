@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<title>ADICTI 電話中心座席系統</title>
+<link rel="icon" href="ADICTI.jpg" type="image/jpeg" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="topbar">
+    <div class="title"><img src="ADICTI.jpg" alt="ADICTI" class="topbar-logo" />ADICTI 電話中心座席系統</div>
+    <div class="right">
+      <span class="ws-status down" id="wsStatus">通話事件：連線中...</span>
+      <span class="who" id="whoAmI"></span>
+      <button id="logoutBtn">登出</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabBar">
+    <button class="tab-btn active" data-tab="board">即時通話看板</button>
+    <button class="tab-btn" data-tab="callhistory">通話紀錄</button>
+    <button class="tab-btn" data-tab="inbound">來電報表</button>
+    <button class="tab-btn" data-tab="extension">分機設定</button>
+    <button class="tab-btn admin-only" data-tab="employees" style="display:none;">員工管理</button>
+    <button class="tab-btn admin-only" data-tab="customers" style="display:none;">客戶管理</button>
+  </div>
+
+  <!-- 即時通話看板 -->
+  <div id="tab-board" class="tab-panel active">
+    <div class="toolbar">
+      <span class="hint" id="boardHint">正在載入座席資訊...</span>
+    </div>
+    <div class="board-legend">
+      <span><i style="background:#bbbbbb"></i>待機</span>
+      <span><i style="background:#FFC9C9"></i>撥入</span>
+      <span><i style="background:#FFFFBC"></i>撥出</span>
+      <span><i style="background:#82FF82"></i>通話中</span>
+      <span><i style="background:#000000"></i>黑名單來電</span>
+    </div>
+    <div class="board-grid" id="boardGrid"></div>
+
+    <div class="section-title" style="margin-top:24px;">虛擬內線</div>
+    <div class="board-grid" id="extBoardGrid"></div>
+  </div>
+
+  <!-- 通話紀錄 -->
+  <div id="tab-callhistory" class="tab-panel">
+    <div class="toolbar">
+      <select id="chRangePreset">
+        <option value="today">今天</option>
+        <option value="week">最近 7 天</option>
+        <option value="thisWeek">本週</option>
+        <option value="month">本月</option>
+        <option value="year">今年</option>
+        <option value="custom">自訂區間</option>
+      </select>
+      <input type="date" id="chStartDate" style="display:none;" />
+      <input type="date" id="chEndDate" style="display:none;" />
+      <input type="text" id="chTelFilter" placeholder="電話號碼（選填）" style="width:160px;" />
+      <button id="chSearchBtn">查詢</button>
+    </div>
+    <div class="section-title">通話紀錄</div>
+    <table class="data-table" id="chTable">
+      <thead>
+        <tr>
+          <th>編號</th><th>類型</th><th>機碼</th><th>虛擬/實體埠</th><th>電話號碼</th>
+          <th>分機</th><th>開始時間</th><th>接通時間</th><th>結束時間</th><th>通話秒數</th>
+          <th>響鈴次數</th><th>錄音檔</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- 來電報表 -->
+  <div id="tab-inbound" class="tab-panel">
+    <div class="toolbar">
+      <input type="date" id="ibStartDate" />
+      <input type="date" id="ibEndDate" />
+      <input type="text" id="ibTel" placeholder="電話號碼" style="width:140px;" />
+      <input type="text" id="ibName" placeholder="客戶姓名" style="width:120px;" />
+      <input type="text" id="ibAddr" placeholder="地址關鍵字" style="width:140px;" />
+      <select id="ibStatus">
+        <option value="">全部狀態</option>
+        <option value="answered">來電接聽</option>
+        <option value="missed">未接</option>
+        <option value="outbound">撥出</option>
+      </select>
+      <button id="ibSearchBtn">查詢</button>
+    </div>
+    <div class="section-title">來電報表</div>
+    <table class="data-table" id="ibTable">
+      <thead>
+        <tr>
+          <th>時間</th><th>電話號碼</th><th>客戶姓名</th><th>地址</th><th>狀態</th>
+          <th>接聽分機</th><th>通話秒數</th><th>錄音檔</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- 分機設定 -->
+  <div id="tab-extension" class="tab-panel">
+    <div class="section-title">分機設定</div>
+    <p class="hint">您目前的分機號碼：<strong id="extCurrentNum">-</strong></p>
+    <div class="field" style="max-width:300px;">
+      <label>新的分機號碼</label>
+      <input type="text" id="extNewNum" />
+    </div>
+    <button class="primary" style="width:auto; padding:8px 20px;" id="extSaveBtn">更新分機號碼</button>
+    <div class="error-msg" id="extMsg"></div>
+
+    <div class="section-title" style="margin-top:30px;">變更密碼</div>
+    <div class="field" style="max-width:300px;">
+      <label>目前密碼</label>
+      <input type="password" id="pwCurrentPassword" autocomplete="current-password" />
+    </div>
+    <div class="field" style="max-width:300px;">
+      <label>新密碼</label>
+      <input type="password" id="pwNewPassword" autocomplete="new-password" />
+    </div>
+    <div class="field" style="max-width:300px;">
+      <label>確認新密碼</label>
+      <input type="password" id="pwConfirmPassword" autocomplete="new-password" />
+    </div>
+    <button class="primary" style="width:auto; padding:8px 20px;" id="pwChangeBtn">變更密碼</button>
+    <div class="error-msg" id="pwMsg"></div>
+  </div>
+
+  <!-- 員工管理（admin） -->
+  <div id="tab-employees" class="tab-panel">
+    <div class="toolbar">
+      <button id="empAddBtn">新增員工</button>
+      <button id="empRefreshBtn">重新整理</button>
+    </div>
+    <div class="section-title">員工列表</div>
+    <table class="data-table" id="empTable">
+      <thead><tr><th>編號</th><th>員工編號</th><th>姓名</th><th>角色</th><th>分機</th><th>虛擬內線</th><th>停用</th><th>密碼</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- 客戶管理（admin） -->
+  <div id="tab-customers" class="tab-panel">
+    <div class="toolbar">
+      <input type="text" id="custSearchTel" placeholder="用電話號碼搜尋" style="width:160px;" />
+      <button id="custSearchBtn">搜尋</button>
+      <button id="custAddBtn">新增客戶</button>
+      <button id="custRefreshBtn">重新整理</button>
+    </div>
+    <div class="section-title">客戶列表</div>
+    <table class="data-table" id="custTable">
+      <thead><tr><th>編號</th><th>姓名</th><th>電話</th><th>縣市</th><th>鄉鎮</th><th>地址</th><th>黑名單</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- 新增員工視窗 -->
+  <div class="modal-backdrop" id="empAddBackdrop">
+    <div class="modal-box">
+      <h2>新增員工</h2>
+      <div class="field"><label>員工編號</label><input type="text" id="empAddNo" /></div>
+      <div class="field"><label>密碼</label><input type="password" id="empAddPassword" /></div>
+      <div class="field"><label>姓名</label><input type="text" id="empAddName" /></div>
+      <div class="field">
+        <label>角色</label>
+        <select id="empAddRole">
+          <option value="operator">operator（客服）</option>
+          <option value="supervisor">supervisor（主管）</option>
+          <option value="admin">admin（管理者）</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" id="empAddCancelBtn">取消</button>
+        <button class="primary" id="empAddSaveBtn">新增</button>
+      </div>
+      <div class="error-msg" id="empAddMsg"></div>
+    </div>
+  </div>
+
+  <!-- 變更密碼視窗 -->
+  <div class="modal-backdrop" id="empPasswordBackdrop">
+    <div class="modal-box">
+      <h2>變更密碼</h2>
+      <p class="hint" id="empPasswordTarget"></p>
+      <div class="field" id="empCurrentPasswordField" style="display:none;">
+        <label>目前密碼</label>
+        <input type="password" id="empCurrentPassword" />
+      </div>
+      <div class="field"><label>新密碼</label><input type="password" id="empNewPassword" /></div>
+      <div class="field"><label>確認新密碼</label><input type="password" id="empNewPasswordConfirm" /></div>
+      <div class="modal-actions">
+        <button class="secondary" id="empPasswordCancelBtn">取消</button>
+        <button class="primary" id="empPasswordSaveBtn">變更</button>
+      </div>
+      <div class="error-msg" id="empPasswordMsg"></div>
+    </div>
+  </div>
+
+  <!-- 新增客戶視窗 -->
+  <div class="modal-backdrop" id="custAddBackdrop">
+    <div class="modal-box">
+      <h2>新增客戶</h2>
+      <div class="field"><label>電話</label><input type="text" id="custAddTel" /></div>
+      <div class="field"><label>姓名</label><input type="text" id="custAddName" /></div>
+      <div class="field"><label>縣市</label><input type="text" id="custAddCounty" /></div>
+      <div class="field"><label>鄉鎮</label><input type="text" id="custAddTownship" /></div>
+      <div class="field"><label>地址</label><input type="text" id="custAddAddress" /></div>
+      <div class="modal-actions">
+        <button class="secondary" id="custAddCancelBtn">取消</button>
+        <button class="primary" id="custAddSaveBtn">新增</button>
+      </div>
+      <div class="error-msg" id="custAddMsg"></div>
+    </div>
+  </div>
+
+  <!-- 來電螢幕彈出視窗 -->
+  <div class="modal-backdrop" id="popBackdrop">
+    <div class="modal-box" id="popBox">
+      <h2>
+        來電資訊
+        <span id="popNewFlag" class="new-customer-flag" style="display:none;">新客戶</span>
+        <span id="popBlacklistFlag" class="blacklist-flag" style="display:none;">黑名單</span>
+      </h2>
+      <p>來電號碼：<strong id="popTelNo"></strong></p>
+      <div class="field">
+        <label>姓名</label>
+        <input type="text" id="popName" />
+      </div>
+      <div class="field">
+        <label>縣市</label>
+        <input type="text" id="popCounty" />
+      </div>
+      <div class="field">
+        <label>鄉鎮</label>
+        <input type="text" id="popTownship" />
+      </div>
+      <div class="field">
+        <label>地址</label>
+        <input type="text" id="popAddress" />
+      </div>
+      <div class="modal-actions">
+        <button class="secondary" id="popCloseBtn">關閉</button>
+        <button class="primary" id="popSaveBtn">儲存</button>
+      </div>
+      <div class="error-msg" id="popMsg"></div>
+    </div>
+  </div>
+
+  <script src="js/api-client.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/ws-client.js"></script>
+  <script>
+    if (!Api.isLoggedIn()) {
+      window.location.href = 'login.html';
+    }
+    const employee = JSON.parse(sessionStorage.getItem('adicti.operator.employee') || 'null');
+    if (employee) {
+      document.getElementById('whoAmI').textContent = `${employee.name || employee.employeeNo}（${employee.role}）`;
+      if (employee.role === 'admin') {
+        document.querySelectorAll('.admin-only').forEach((el) => { el.style.display = ''; });
+      }
+    }
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      try { await Api.post('/auth/logout'); } catch (e) { /* 忽略登出失敗，仍清除本機 token */ }
+      WsClient.disconnect();
+      Api.setToken(null);
+      sessionStorage.removeItem('adicti.operator.employee');
+      window.location.href = 'login.html';
+    });
+
+    WsClient.onStatus((status) => {
+      const el = document.getElementById('wsStatus');
+      if (status === 'up') {
+        el.textContent = '通話事件：已連線';
+        el.classList.add('up');
+        el.classList.remove('down');
+      } else {
+        el.textContent = status === 'connecting' ? '通話事件：連線中...' : '通話事件：已斷線，重新連線中...';
+        el.classList.add('down');
+        el.classList.remove('up');
+      }
+    });
+
+    // 分頁切換：跟 ADICTICallCenter.Web 一樣用 display 控制，但這裡
+    // WebSocket 連線是整個 App 生命週期只建立一次，不會因為切分頁而重連。
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+    const loadedTabs = new Set();
+
+    function activateTab(name) {
+      tabButtons.forEach((btn) => btn.classList.toggle('active', btn.dataset.tab === name));
+      tabPanels.forEach((panel) => panel.classList.toggle('active', panel.id === `tab-${name}`));
+      if (!loadedTabs.has(name)) {
+        loadedTabs.add(name);
+        if (window.Tabs && window.Tabs[name]) window.Tabs[name].init();
+      }
+    }
+    window.activateTab = activateTab;
+
+    tabButtons.forEach((btn) => btn.addEventListener('click', () => activateTab(btn.dataset.tab)));
+  </script>
+  <script src="js/customer-panel.js"></script>
+  <script src="js/board.js"></script>
+  <script src="js/call-history.js"></script>
+  <script src="js/inbound-report.js"></script>
+  <script src="js/extension.js"></script>
+  <script src="js/employees.js"></script>
+  <script src="js/customers.js"></script>
+  <script>
+    window.Tabs = {
+      board: BoardTab,
+      callhistory: CallHistoryTab,
+      inbound: InboundReportTab,
+      extension: ExtensionTab,
+      employees: EmployeesTab,
+      customers: CustomersTab,
+    };
+    // 預設分頁（即時通話看板）跟 WebSocket 連線一開始就啟動。
+    BoardTab.init();
+    loadedTabs.add('board');
+    WsClient.connect();
+  </script>
+</body>
+</html>
