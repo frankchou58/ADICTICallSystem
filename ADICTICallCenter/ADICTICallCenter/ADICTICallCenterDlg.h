@@ -115,6 +115,12 @@ public:
 	CSettingsDlg m_SettingsUIDlg;
 	CWebConsoleDlg m_WebConsoleUIDlg;
 	afx_msg void OnBnClickedOk();
+	afx_msg void OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized);
+	void RefreshCurrentTabData();
+	// OnInitDialog() 執行到一半（子分頁物件的 Create()）就可能先收到
+	// WM_ACTIVATE，這時 m_pWndModleDlg[] 還沒指派完，RefreshCurrentTabData()
+	// 存取到還是 nullptr 的分頁物件就會炸掉；用這個旗標擋掉初始化完成前的 OnActivate。
+	BOOL m_DlgReady;
 	int m_BackEndConnect;
 	int m_DataBase;
 	CStatic m_Message;

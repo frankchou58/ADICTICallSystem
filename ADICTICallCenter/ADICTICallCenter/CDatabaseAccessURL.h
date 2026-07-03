@@ -47,6 +47,12 @@ private:
 	int MakeHttpConnection(LPCSTR pVerb, LPCSTR pRoute, LPCSTR pExtraQuery, LPCSTR pJsonBody, CString* pRet);
 	int MakeHttpConnectionRaw(LPCSTR pVerb, LPCSTR pRoute, LPCSTR pExtraQuery, LPCSTR pJsonBody, CString* pRet, BOOL bAttachAuth);
 	bool ParseEnvelope(const CString& Response, Json::Value& outData);
+	// 從 {success:false, message:"..."} 這種錯誤回應裡取出訊息文字，寫進
+	// pMessage（呼叫端自備的緩衝區）。2026-07-03 新增，搭配 MakeHttpConnectionRaw
+	// 現在不管成功失敗都會讀回應內容，讓 SetMachineOutPortsByMachineID 等
+	// 方法可以把後端驗證錯誤的具體原因（例如「合併機碼已被別的類型使用」）
+	// 回傳給呼叫端顯示，不再只有一個看不出原因的錯誤碼。
+	void ExtractErrorMessage(const CString& Response, PCHAR pMessage, int BufferSize);
 	CString fixjsonchinese(std::string inputstringbuf);
 	static std::string JsonEscape(LPCSTR pValue);
 	// 新版 outline_ports/extline_ports 是「一個實體埠一列」，vport 只是
@@ -101,13 +107,32 @@ public:
 	int GetAllMachinesSubProgramInfo(PSubProgramGroup_T pPBXGroup,
 		PSubProgramGroup_T pCallerIDBoxGroup,
 		PSubProgramGroup_T pVoiceCardGroup);
-	int SetMachineOutPortsByMachineID(int MachineType, int MachineID, int OutPort, PCHAR pMessage);
+	// pFailedPortCount（選填）：新數量涵蓋範圍裡有幾個實體埠因為 dbo.outline/
+	// dbo.extline 池子裡已經沒有真正閒置的列可以認領而指派失敗——這個數字
+	// 現在由後端在同一次 PATCH 裡直接算好回傳，呼叫端不用再自己另外發一輪
+	// HTTP 請求去重新核對全部 240 個虛擬埠（那樣做過，一次設定要等好幾百次
+	// 同步 API 呼叫跑完，非常慢，2026-07 拿掉了）。
+	int SetMachineOutPortsByMachineID(int MachineType, int MachineID, int OutPort, PCHAR pMessage, int* pFailedPortCount = NULL);
 	int GetMachineOutPortsByMachineID(int MachineType, int MachineID, int* pOutPort, PCHAR pMessage);
-	int SetMachineExtPortsByMachineID(int MachineType, int MachineID, int ExtPort, PCHAR pMessage);
+	int SetMachineExtPortsByMachineID(int MachineType, int MachineID, int ExtPort, PCHAR pMessage, int* pFailedPortCount = NULL);
 	int SetMachineAliasByMachineID(int MachineType, int MachineID, PCHAR pAlias, PCHAR pMessage);
 	int SetMachineConnected(int MachineType, int MachineID, PCHAR pIPAddr, BOOL bConnected, PCHAR pMessage);
 	int AssignPhyOutPortInfo(int VPort, int MachineType, int MachineID, int PhyPort, PCHAR pMessage);
 	int AssignPhyExtPortInfo(int VPort, int MachineID, int PhyPort, PCHAR pMessage);
+	// 取消指派：跟 AssignPhy*PortInfo 相反，把這個實體埠跟機碼的關聯清掉
+	// （不影響虛擬線路編號本身）。2026-07-03 新增：客戶資料庫的
+	// outline/extline 是固定 240 筆的池子，縮減外線/內線數量時沒辦法像
+	// 舊設計那樣直接刪列，只能明確呼叫這個來取消指派，否則畫面會一直
+	// 顯示已經不該存在的舊埠號/虛擬編號。找不到這個實體埠（本來就沒
+	// 指派過）時視為成功，語意跟 AssignPhy*PortInfo 一樣是 idempotent。
+	int UnassignPhyOutPortInfo(int MachineType, int MachineID, int PhyPort, PCHAR pMessage);
+	int UnassignPhyExtPortInfo(int MachineID, int PhyPort, PCHAR pMessage);
+	// 查詢資料庫裡目前實際指派給這個機碼(該類型)的所有實體埠編號——縮減
+	// 外線/內線數量時，舊的埠數只存在資料庫裡，程式這邊的靜態陣列拿不到，
+	// 只能實際查一次才知道哪些埠已經超出新數量、需要呼叫 UnassignPhy*PortInfo。
+	// pPhyPorts 陣列大小至少要 VIRTUAL_PORT_NUMS。
+	int GetWiredOutPhyPorts(int MachineType, int MachineID, int* pPhyPorts, int MaxCount, int* pActualCount);
+	int GetWiredExtPhyPorts(int MachineID, int* pPhyPorts, int MaxCount, int* pActualCount);
 	int GetOutVPort(int MachineType, int MachineID, int PhyPort, int* pOutVPort, PCHAR pMessage);
 	int AddInternalCallRecord(int MachineID, int StartTime, int FromExtNum, int ToExtNum, int* pDBIndexID, PCHAR pMessage);
 	int AddInternalCallRecordOneTime(PCallBlock_T pCallBlock, PCHAR pMessage);

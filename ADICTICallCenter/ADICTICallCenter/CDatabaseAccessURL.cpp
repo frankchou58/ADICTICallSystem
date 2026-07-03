@@ -257,6 +257,33 @@ bool CDatabaseAccessURL::ParseEnvelope(const CString& Response, Json::Value& out
 	return success;
 }
 
+// 從錯誤回應（{success:false, message:"..."}）裡取出訊息文字，寫進
+// pMessage（呼叫端自備的緩衝區，大小 BufferSize）。解析失敗或本來就是
+// 空的就寫入空字串，呼叫端可以用「pMessage 是否為空字串」判斷有沒有
+// 抓到訊息。
+void CDatabaseAccessURL::ExtractErrorMessage(const CString& Response, PCHAR pMessage, int BufferSize)
+{
+	if (!pMessage || BufferSize <= 0)
+		return;
+	pMessage[0] = '\0';
+
+	if (Response.IsEmpty())
+		return;
+
+	Json::Reader reader;
+	Json::Value root;
+	std::string ResponseData = CT2A(Response.GetString());
+	if (!reader.parse(ResponseData, root))
+		return;
+
+	std::string Message = root.get("message", "").asString();
+	if (Message.empty())
+		return;
+
+	CString FixedMessage = fixjsonchinese(Message);
+	strcpy_s(pMessage, BufferSize, CT2A(FixedMessage.GetString()));
+}
+
 int CDatabaseAccessURL::Login()
 {
 	CString EmployeeNo = AfxGetApp()->GetProfileString("SystemSetting", "ApiEmployeeNo", "");
@@ -331,10 +358,16 @@ int CDatabaseAccessURL::MakeHttpConnectionRaw(LPCSTR pVerb, LPCSTR pRoute, LPCST
 		DWORD statusCode = 0;
 		file->QueryInfoStatusCode(statusCode);
 
+		// 不管狀態碼是不是 2xx 都把回應內容讀出來——這支 API 的錯誤回應
+		// 一律是 {success:false, message:"..."} 這種 JSON，之前只有成功
+		// 才讀，導致 422/409 這類「請求本身有問題」的錯誤（例如 2026-07-03
+		// 新增的「同一個機碼同時間只能有一種類型」驗證）完全沒有訊息可以
+		// 顯示給使用者，只留下一個不知道為什麼失敗的錯誤碼。
+		if (pRet)
+			file->ReadString(*pRet);
+
 		if (statusCode == HTTP_STATUS_OK || statusCode == 201 /* Created */)
 		{
-			if (pRet)
-				file->ReadString(*pRet);
 			Ret = ERROR_CODE_SUCCESS;
 		}
 		else if (statusCode == HTTP_STATUS_DENIED /* 401 */)
@@ -828,8 +861,11 @@ int CDatabaseAccessURL::GetAllMachinesSubProgramInfo(PSubProgramGroup_T pPBXGrou
 	return ERROR_CODE_SUCCESS;
 }
 
-int CDatabaseAccessURL::SetMachineOutPortsByMachineID(int MachineType, int MachineID, int OutPort, PCHAR pMessage)
+int CDatabaseAccessURL::SetMachineOutPortsByMachineID(int MachineType, int MachineID, int OutPort, PCHAR pMessage, int* pFailedPortCount)
 {
+	if (pFailedPortCount)
+		*pFailedPortCount = 0;
+
 	Json::Value body;
 	body["outPortCount"] = OutPort;
 	std::string JsonBody = Json::FastWriter().write(body);
@@ -838,7 +874,25 @@ int CDatabaseAccessURL::SetMachineOutPortsByMachineID(int MachineType, int Machi
 	Route.Format("/machines/%d/%d", MachineType, MachineID);
 
 	CString Response;
-	return MakeHttpConnection("PATCH", Route, "", JsonBody.c_str(), &Response);
+	int Ret = MakeHttpConnection("PATCH", Route, "", JsonBody.c_str(), &Response);
+	// 2026-07-03 新增：同一個合併機碼同時間只能有一種類型的外/內線數量
+	// 不是 0，違反時後端會回傳明確訊息（例如「合併機碼已被交換機類型
+	// 使用...」），這裡取出來讓呼叫端可以顯示給管理員看，不要只是一個
+	// 看不出原因的錯誤碼。
+	if (Ret != ERROR_CODE_SUCCESS)
+	{
+		if (pMessage)
+			ExtractErrorMessage(Response, pMessage, 200);
+		return Ret;
+	}
+
+	if (pFailedPortCount)
+	{
+		Json::Value data;
+		if (ParseEnvelope(Response, data))
+			*pFailedPortCount = data.get("outPortFailedCount", 0).asInt();
+	}
+	return Ret;
 }
 
 int CDatabaseAccessURL::GetMachineOutPortsByMachineID(int MachineType, int MachineID, int* pOutPort, PCHAR pMessage)
@@ -849,8 +903,11 @@ int CDatabaseAccessURL::GetMachineOutPortsByMachineID(int MachineType, int Machi
 	return GetMachineInfo(MachineType, MachineID, NULL, pOutPort, NULL, pMessage);
 }
 
-int CDatabaseAccessURL::SetMachineExtPortsByMachineID(int MachineType, int MachineID, int ExtPort, PCHAR pMessage)
+int CDatabaseAccessURL::SetMachineExtPortsByMachineID(int MachineType, int MachineID, int ExtPort, PCHAR pMessage, int* pFailedPortCount)
 {
+	if (pFailedPortCount)
+		*pFailedPortCount = 0;
+
 	Json::Value body;
 	body["extPortCount"] = ExtPort;
 	std::string JsonBody = Json::FastWriter().write(body);
@@ -859,7 +916,22 @@ int CDatabaseAccessURL::SetMachineExtPortsByMachineID(int MachineType, int Machi
 	Route.Format("/machines/%d/%d", MachineType, MachineID);
 
 	CString Response;
-	return MakeHttpConnection("PATCH", Route, "", JsonBody.c_str(), &Response);
+	int Ret = MakeHttpConnection("PATCH", Route, "", JsonBody.c_str(), &Response);
+	// 理由同 SetMachineOutPortsByMachineID()。
+	if (Ret != ERROR_CODE_SUCCESS)
+	{
+		if (pMessage)
+			ExtractErrorMessage(Response, pMessage, 200);
+		return Ret;
+	}
+
+	if (pFailedPortCount)
+	{
+		Json::Value data;
+		if (ParseEnvelope(Response, data))
+			*pFailedPortCount = data.get("extPortFailedCount", 0).asInt();
+	}
+	return Ret;
 }
 
 int CDatabaseAccessURL::SetMachineAliasByMachineID(int MachineType, int MachineID, PCHAR pAlias, PCHAR pMessage)
@@ -937,6 +1009,89 @@ int CDatabaseAccessURL::AssignPhyExtPortInfo(int VPort, int MachineID, int PhyPo
 
 	CString Response;
 	return MakeHttpConnection("PATCH", Route, "", JsonBody.c_str(), &Response);
+}
+
+int CDatabaseAccessURL::UnassignPhyOutPortInfo(int MachineType, int MachineID, int PhyPort, PCHAR pMessage)
+{
+	int id = 0;
+	int Ret = FindOutlinePortId(MachineType, MachineID, PhyPort, &id);
+	if (Ret == ERROR_CODE_HTTP_NOT_FOUND)
+		return ERROR_CODE_SUCCESS; // 本來就沒指派過，當作成功。
+	if (Ret != ERROR_CODE_SUCCESS)
+		return Ret;
+
+	CString Route;
+	Route.Format("/outline-ports/%d", id);
+
+	CString Response;
+	return MakeHttpConnection("DELETE", Route, "", NULL, &Response);
+}
+
+int CDatabaseAccessURL::UnassignPhyExtPortInfo(int MachineID, int PhyPort, PCHAR pMessage)
+{
+	int id = 0;
+	int Ret = FindExtlinePortId(MACHINE_TYPE_PBX, MachineID, PhyPort, &id);
+	if (Ret == ERROR_CODE_HTTP_NOT_FOUND)
+		return ERROR_CODE_SUCCESS; // 本來就沒指派過，當作成功。
+	if (Ret != ERROR_CODE_SUCCESS)
+		return Ret;
+
+	CString Route;
+	Route.Format("/extline-ports/%d", id);
+
+	CString Response;
+	return MakeHttpConnection("DELETE", Route, "", NULL, &Response);
+}
+
+int CDatabaseAccessURL::GetWiredOutPhyPorts(int MachineType, int MachineID, int* pPhyPorts, int MaxCount, int* pActualCount)
+{
+	CString ExtraQuery;
+	ExtraQuery.Format("&machineNo=%d", MachineID);
+
+	CString Response;
+	int Ret = MakeHttpConnection("GET", "/outline-ports", ExtraQuery, NULL, &Response);
+	if (Ret != ERROR_CODE_SUCCESS)
+		return Ret;
+
+	Json::Value data;
+	if (!ParseEnvelope(Response, data))
+		return ERROR_CODE_INVALID_RESPONSE;
+
+	int Count = 0;
+	for (unsigned int i = 0; i < data.size() && Count < MaxCount; ++i)
+	{
+		if (data[i].get("machineType", 0).asInt() == MachineType)
+		{
+			pPhyPorts[Count++] = data[i].get("phyPort", 0).asInt();
+		}
+	}
+	if (pActualCount)
+		*pActualCount = Count;
+	return ERROR_CODE_SUCCESS;
+}
+
+int CDatabaseAccessURL::GetWiredExtPhyPorts(int MachineID, int* pPhyPorts, int MaxCount, int* pActualCount)
+{
+	CString ExtraQuery;
+	ExtraQuery.Format("&machineNo=%d", MachineID);
+
+	CString Response;
+	int Ret = MakeHttpConnection("GET", "/extline-ports", ExtraQuery, NULL, &Response);
+	if (Ret != ERROR_CODE_SUCCESS)
+		return Ret;
+
+	Json::Value data;
+	if (!ParseEnvelope(Response, data))
+		return ERROR_CODE_INVALID_RESPONSE;
+
+	int Count = 0;
+	for (unsigned int i = 0; i < data.size() && Count < MaxCount; ++i)
+	{
+		pPhyPorts[Count++] = data[i].get("phyPort", 0).asInt();
+	}
+	if (pActualCount)
+		*pActualCount = Count;
+	return ERROR_CODE_SUCCESS;
 }
 
 int CDatabaseAccessURL::GetOutVPort(int MachineType, int MachineID, int PhyPort, int* pOutVPort, PCHAR pMessage)

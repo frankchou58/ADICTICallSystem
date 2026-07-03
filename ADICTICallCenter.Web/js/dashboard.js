@@ -80,5 +80,5 @@ const DashboardTab = (() => {
     document.getElementById('dashboardRefreshBtn').addEventListener('click', load);
   }
 
-  return { init, load };
+  return { init, load, refresh: load };
 })();

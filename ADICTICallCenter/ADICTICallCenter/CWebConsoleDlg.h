@@ -31,6 +31,10 @@ public:
 	virtual BOOL OnInitDialog();
 	afx_msg void OnSize(UINT nType, int cx, int cy);
 	afx_msg void OnDestroy();
+	// 切回這個分頁（或整個 MFC 視窗被切回來變成作用中視窗）時呼叫，等同瀏覽器
+	// 按重新整理——WebView2 還沒初始化完成（m_WebView 還是 nullptr）就先不做事，
+	// 等 NavigationCompleted 那條路徑自己把第一次的畫面載出來就好。
+	void Reload();
 
 private:
 	Microsoft::WRL::ComPtr<ICoreWebView2Controller> m_WebViewController;

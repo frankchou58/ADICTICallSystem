@@ -12,10 +12,29 @@
   </div>
 
   <div class="tabs">
+    <button class="tab-btn" data-tab="status">虛擬內外線狀態</button>
     <button class="tab-btn active" data-tab="pbx">交換機類型</button>
     <button class="tab-btn" data-tab="callerid">來電盒類型</button>
     <button class="tab-btn" data-tab="voicecard">語音卡類型</button>
     <button class="tab-btn" data-tab="settings">設定</button>
+  </div>
+
+  <!-- 虛擬內外線狀態，對應 MFC 主控端同名分頁 -->
+  <div id="tab-status" class="tab-panel">
+    <div class="toolbar">
+      <button id="dashboardRefreshBtn">重新整理</button>
+      <span class="hint">方塊裡的編號是虛擬線路編號，顏色代表目前的通話狀態；內線目前跟 MFC 主控端一樣不分辨通話中/互撥，一律顯示閒置色</span>
+    </div>
+    <div class="legend">
+      <span><i class="status-idle"></i>閒置</span>
+      <span><i class="status-line-in"></i>外線撥入</span>
+      <span><i class="status-line-out"></i>外線撥出</span>
+      <span><i class="status-line-talking"></i>外線通話中</span>
+    </div>
+    <div class="section-title">虛擬外線狀態</div>
+    <div class="port-grid" id="outlineGrid"></div>
+    <div class="section-title" style="margin-top:20px;">虛擬內線狀態</div>
+    <div class="port-grid" id="extlineGrid"></div>
   </div>
 
   <!-- 交換機類型 -->
@@ -90,15 +109,22 @@
       if (!loadedTabs.has(name)) {
         loadedTabs.add(name);
         initTab(name);
+      } else {
+        // 交換機/來電盒/語音卡三個分頁的機碼互斥鎖定狀態互相牽動——在
+        // 別的分頁把某個機碼的類型設定成非 0，這個分頁的鎖定提示才會需要
+        // 更新，所以每次切回來都要重新抓最新資料，不能只切一次就快取著。
+        refreshTab(name);
       }
     }
 
     tabButtons.forEach((btn) => btn.addEventListener('click', () => activateTab(btn.dataset.tab)));
   </script>
+  <script src="js/dashboard.js"></script>
   <script src="js/machines.js"></script>
   <script src="js/settings.js"></script>
   <script>
     const tabs = {
+      status: DashboardTab,
       pbx: createMachinesTab(1, { table: 'pbxTable', outGrid: 'pbxOutGrid', extGrid: 'pbxExtGrid', refreshBtn: 'pbxRefreshBtn' }),
       callerid: createMachinesTab(2, { table: 'calleridTable', outGrid: 'calleridGrid', refreshBtn: 'calleridRefreshBtn' }),
       voicecard: createMachinesTab(3, { table: 'voicecardTable', outGrid: 'voicecardGrid', refreshBtn: 'voicecardRefreshBtn' }),
@@ -107,6 +133,12 @@
 
     function initTab(name) {
       tabs[name].init();
+    }
+
+    function refreshTab(name) {
+      if (tabs[name] && typeof tabs[name].refresh === 'function') {
+        tabs[name].refresh();
+      }
     }
 
     // 預設分頁（交換機類型）一開始就載入

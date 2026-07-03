@@ -83,7 +83,10 @@ class OutlinePortController extends Controller
     {
         [$lineNo, $typeIndex, $column] = $this->decodeId((int) $request->params['id']);
 
-        $stmt = $this->db()->prepare("SELECT machine_id, $column AS phy_port FROM dbo.outline WHERE line_no = :line_no");
+        $stmt = $this->db()->prepare(
+            "SELECT machine_id, phy_port_typeA, phy_port_typeB, phy_port_typeC, $column AS phy_port
+             FROM dbo.outline WHERE line_no = :line_no"
+        );
         $stmt->execute(['line_no' => $lineNo]);
         $current = $stmt->fetch();
 
@@ -121,7 +124,22 @@ class OutlinePortController extends Controller
                     'target' => $targetLineNo,
                 ]);
 
-                $clear = $db->prepare("UPDATE dbo.outline SET $column = NULL WHERE line_no = :line_no");
+                // 跟 destroy() 一樣的收尾：這是原本這一列上最後一個還有
+                // 設定的 type 欄位時，順便把 machine_id 也清掉，不要留下
+                // 「有 machine_id 但三個 type 欄位都是 NULL」的孤兒列
+                // （這種列不會出現在任何查詢結果裡，但終究是不一致的
+                // 殘留資料，之前一次手動測試就留下過一筆這樣的資料）。
+                $otherTypesStillSet = false;
+                foreach (self::TYPE_COLUMNS as $otherTypeIndex => $otherColumn) {
+                    if ($otherTypeIndex !== $typeIndex && $current[$otherColumn] !== null) {
+                        $otherTypesStillSet = true;
+                        break;
+                    }
+                }
+                $clearSql = $otherTypesStillSet
+                    ? "UPDATE dbo.outline SET $column = NULL WHERE line_no = :line_no"
+                    : "UPDATE dbo.outline SET $column = NULL, machine_id = NULL WHERE line_no = :line_no";
+                $clear = $db->prepare($clearSql);
                 $clear->execute(['line_no' => $lineNo]);
 
                 $db->commit();
@@ -147,6 +165,51 @@ class OutlinePortController extends Controller
         }
 
         Response::ok(null, '外線埠已更新。');
+    }
+
+    /**
+     * DELETE /outline-ports/{id} - unassign this physical port from whichever
+     * machine it currently belongs to (clears the phy_port_type* column for
+     * this specific type). Added 2026-07-03: reducing a machine's
+     * outPortCount used to delete the corresponding dbo.outline_ports rows
+     * outright in this API's original design; against this customer's fixed
+     * 240-row dbo.outline pool there's nothing to delete, so this is the
+     * closest equivalent - it disassociates the port without touching the
+     * row's vport (the virtual line itself, and any other type still wired
+     * to it, are left alone). If this was the last type wired to that
+     * line_no's machine_id, machine_id is cleared too so it doesn't dangle.
+     */
+    public function destroy(Request $request): void
+    {
+        [$lineNo, $typeIndex, $column] = $this->decodeId((int) $request->params['id']);
+
+        $stmt = $this->db()->prepare(
+            "SELECT machine_id, phy_port_typeA, phy_port_typeB, phy_port_typeC, $column AS phy_port
+             FROM dbo.outline WHERE line_no = :line_no"
+        );
+        $stmt->execute(['line_no' => $lineNo]);
+        $current = $stmt->fetch();
+
+        if (!$current || $current['phy_port'] === null) {
+            Response::notFound('找不到這個外線埠。');
+            return;
+        }
+
+        $otherTypesStillSet = false;
+        foreach (self::TYPE_COLUMNS as $otherTypeIndex => $otherColumn) {
+            if ($otherTypeIndex !== $typeIndex && $current[$otherColumn] !== null) {
+                $otherTypesStillSet = true;
+                break;
+            }
+        }
+
+        $sql = $otherTypesStillSet
+            ? "UPDATE dbo.outline SET $column = NULL WHERE line_no = :line_no"
+            : "UPDATE dbo.outline SET $column = NULL, machine_id = NULL WHERE line_no = :line_no";
+        $update = $this->db()->prepare($sql);
+        $update->execute(['line_no' => $lineNo]);
+
+        Response::ok(null, '外線埠已取消指派。');
     }
 
     /** @return array{0:int,1:int,2:string} [lineNo, typeIndex, columnName] */

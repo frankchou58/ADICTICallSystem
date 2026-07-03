@@ -668,6 +668,24 @@ void CPbxDlg::OnEditSubProgramListItem(NMHDR* pNMHDR, LRESULT* pResult)
 	m_ComboListPortsSelect.ShowWindow(FALSE);
 	if (m_Subitem == ID_LIST_SUB_PROGRAM_OUT_PORTS || m_Subitem == ID_LIST_SUB_PROGRAM_EXT_PORTS)
 	{
+		// 防呆：合併機碼互斥規則——這個機碼如果已經被別的類型用掉了（外線或
+		// 內線數量不是 0），這裡直接擋掉，不讓使用者打開下拉選單去改，
+		// 跟後端 PATCH /machines 的驗證規則保持一致，避免選了半天才在儲存時被拒絕。
+		int OccupyingType = 0;
+		if (m_CallerIDSubProgramGroup[m_Item].OutPortNum > 0 || m_CallerIDSubProgramGroup[m_Item].ExtPortNum > 0)
+			OccupyingType = MACHINE_TYPE_CALLER_ID_BOX;
+		else if (m_VoiceCardSubProgramGroup[m_Item].OutPortNum > 0 || m_VoiceCardSubProgramGroup[m_Item].ExtPortNum > 0)
+			OccupyingType = MACHINE_TYPE_VOICE_CARD;
+
+		if (OccupyingType != 0)
+		{
+			CString TypeLabel = (OccupyingType == MACHINE_TYPE_CALLER_ID_BOX) ? _T("來電盒") : _T("語音卡");
+			CString Msg;
+			Msg.Format(_T("合併機碼 %d 目前已經被「%s類型」使用（外線或內線數量不是 0），\r\n請先把%s類型的外線、內線數量都改成 0，才能在這個機碼設定其他類型。"), m_Item + 1, TypeLabel, TypeLabel);
+			MessageBox(Msg, _T("無法設定"), MB_OK | MB_ICONWARNING);
+			return;
+		}
+
 		ListView_GetSubItemRect(m_ListSubProgram, m_Item, m_Subitem, LVIR_BOUNDS, &rect);
 		int Hight = rect.bottom - rect.top;
 		int Width = rect.right - rect.left;
@@ -744,13 +762,14 @@ void CPbxDlg::OnCbnSelchangeComboPortsSelect()
 			}
 			if (Ret == 0)
 			{
-				Ret = m_DatabaseAccessURL.SetMachineOutPortsByMachineID(MACHINE_TYPE_PBX, SubProgramID, Ports, NULL);
+				CHAR ErrMsg[200] = { 0 };
+				int FailedPortCount = 0;
+				Ret = m_DatabaseAccessURL.SetMachineOutPortsByMachineID(MACHINE_TYPE_PBX, SubProgramID, Ports, ErrMsg, &FailedPortCount);
 				if (Ret == 0)
 				{
 					/*設定外線資料庫*/
 					m_PBXSubProgramGroup[m_Item].OutPortNum = Ports;
 					ShowSubProgramList();
-					int FailedPortCount = SetDBOutVPortSetting(0);
 					if (FailedPortCount > 0)
 					{
 						// 這台部署的資料庫只能搬動既有佈線的實體埠，沒辦法
@@ -761,15 +780,27 @@ void CPbxDlg::OnCbnSelchangeComboPortsSelect()
 						MessageBox(Msg, _T("部分外線埠指派失敗"), MB_OK | MB_ICONWARNING);
 					}
 				}
+				else
+				{
+					CString Msg;
+					if (ErrMsg[0])
+						Msg = ErrMsg;
+					else
+						Msg = _T("設定外線數量失敗，請確認資料庫連線或聯絡系統管理員。");
+					MessageBox(Msg, _T("設定失敗"), MB_OK | MB_ICONWARNING);
+					ShowSubProgramList();
+				}
 			}
 		}
 		break;
 	case ID_LIST_SUB_PROGRAM_EXT_PORTS:
-		Ret = m_DatabaseAccessURL.SetMachineExtPortsByMachineID(MACHINE_TYPE_PBX, SubProgramID, Ports, NULL);
+	{
+		CHAR ExtErrMsg[200] = { 0 };
+		int FailedExtPortCount = 0;
+		Ret = m_DatabaseAccessURL.SetMachineExtPortsByMachineID(MACHINE_TYPE_PBX, SubProgramID, Ports, ExtErrMsg, &FailedExtPortCount);
 		if (Ret == 0)
 		{
 			m_PBXSubProgramGroup[m_Item].ExtPortNum = Ports;
-			int FailedExtPortCount = SetDBExtVPortSetting();
 			LoadMachineData();
 			m_DatabaseAccessURL.GetExtLines(m_ExtPorts);
 			ShowSubProgramList();
@@ -783,7 +814,18 @@ void CPbxDlg::OnCbnSelchangeComboPortsSelect()
 				MessageBox(Msg, _T("部分內線埠指派失敗"), MB_OK | MB_ICONWARNING);
 			}
 		}
+		else
+		{
+			CString Msg;
+			if (ExtErrMsg[0])
+				Msg = ExtErrMsg;
+			else
+				Msg = _T("設定內線數量失敗，請確認資料庫連線或聯絡系統管理員。");
+			MessageBox(Msg, _T("設定失敗"), MB_OK | MB_ICONWARNING);
+			ShowSubProgramList();
+		}
 		break;
+	}
 	}
 }
 

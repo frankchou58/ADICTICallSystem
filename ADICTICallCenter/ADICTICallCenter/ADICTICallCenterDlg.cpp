@@ -61,6 +61,7 @@ CADICTICallCenterDlg::CADICTICallCenterDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_ADICTICALLCENTER_DIALOG, pParent)
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
+	m_DlgReady = FALSE;
 }
 
 void CADICTICallCenterDlg::DoDataExchange(CDataExchange* pDX)
@@ -84,6 +85,7 @@ BEGIN_MESSAGE_MAP(CADICTICallCenterDlg, CDialogEx)
 //ON_WM_SIZING()
 ON_WM_GETMINMAXINFO()
 ON_WM_TIMER()
+ON_WM_ACTIVATE()
 ON_BN_CLICKED(IDC_BUTTON_SHOW_EXT_LIST, &CADICTICallCenterDlg::OnBnClickedButtonShowExtList)
 ON_NOTIFY(TCN_SELCHANGE, IDC_TAB1, & CADICTICallCenterDlg::OnTcnSelchangeTab1)
 //ON_WM_CHILDACTIVATE()
@@ -372,6 +374,8 @@ BOOL CADICTICallCenterDlg::OnInitDialog()
 		OpenMachineServer();
 		OpenWebSocketServer();
 	}
+
+	m_DlgReady = TRUE;
 
 	return TRUE;  // 傳回 TRUE，除非您對控制項設定焦點
 }
@@ -942,6 +946,7 @@ void CADICTICallCenterDlg::OnTcnSelchangeTab1(NMHDR* pNMHDR, LRESULT* pResult)
 	CCallRecorderDlg* pCallRecorderDlg = (CCallRecorderDlg*)m_pWndModleDlg[CTRL_ID_CALL_RECORDER_TYPE_UI];
 	CPbxDlg* pPBXTypeDlg = (CPbxDlg*)m_pWndModleDlg[CTRL_ID_PBX_TYPE_UI];
 	CVoiceRecorderDlg* pVoiceRecorderDlg = (CVoiceRecorderDlg*)m_pWndModleDlg[CTRL_ID_VOICE_RECORDER_TYPE_UI];
+	CWebConsoleDlg* pWebConsoleDlg = (CWebConsoleDlg*)m_pWndModleDlg[CTRL_ID_WEB_CONSOLE_UI];
 
 	int CurSel = m_TabCtrl.GetCurSel();
 	switch (CurSel)
@@ -1012,6 +1017,8 @@ void CADICTICallCenterDlg::OnTcnSelchangeTab1(NMHDR* pNMHDR, LRESULT* pResult)
 		m_WebConsoleUIDlg.ShowWindow(false);
 		break;
 	case CTRL_ID_WEB_CONSOLE_UI:
+		if (pWebConsoleDlg)
+			pWebConsoleDlg->Reload();
 		m_ShowLinesStatusDlg.ShowWindow(false);
 		//m_OutLineCallStatusDlg.ShowWindow(false);
 		m_PBXTypeUIDlg.ShowWindow(false);
@@ -1025,6 +1032,61 @@ void CADICTICallCenterDlg::OnTcnSelchangeTab1(NMHDR* pNMHDR, LRESULT* pResult)
 	}
 
 	*pResult = 0;
+}
+
+
+// 網頁版控台（ADICTICallCenter.Web）跟這支 MFC 程式共用同一個後端 API，
+// 使用者常見流程是先在網頁上改設定，再切回來這支 MFC 視窗看結果——但如果
+// 切換前 MFC 視窗本來就停在同一個分頁（不是點分頁換過去），TCN_SELCHANGE
+// 不會觸發，畫面就一直停留在切去瀏覽器之前抓到的舊資料。這裡改成只要這個
+// 視窗被切回來變成作用中視窗，就重新整理目前這個分頁，不用使用者手動點兩下
+// 分頁來刷新。
+void CADICTICallCenterDlg::OnActivate(UINT nState, CWnd* pWndOther, BOOL bMinimized)
+{
+	CDialogEx::OnActivate(nState, pWndOther, bMinimized);
+
+	if (m_DlgReady && nState != WA_INACTIVE && !bMinimized)
+		RefreshCurrentTabData();
+}
+
+void CADICTICallCenterDlg::RefreshCurrentTabData()
+{
+	CShowLinesStatusDlg* pShowLinesStatusDlg = (CShowLinesStatusDlg*)m_pWndModleDlg[CTRL_ID_SHOW_PORT_STATUS];
+	CCallRecorderDlg* pCallRecorderDlg = (CCallRecorderDlg*)m_pWndModleDlg[CTRL_ID_CALL_RECORDER_TYPE_UI];
+	CPbxDlg* pPBXTypeDlg = (CPbxDlg*)m_pWndModleDlg[CTRL_ID_PBX_TYPE_UI];
+	CVoiceRecorderDlg* pVoiceRecorderDlg = (CVoiceRecorderDlg*)m_pWndModleDlg[CTRL_ID_VOICE_RECORDER_TYPE_UI];
+	CWebConsoleDlg* pWebConsoleDlg = (CWebConsoleDlg*)m_pWndModleDlg[CTRL_ID_WEB_CONSOLE_UI];
+
+	int CurSel = m_TabCtrl.GetCurSel();
+	switch (CurSel)
+	{
+	case CTRL_ID_SHOW_PORT_STATUS:
+		if (pShowLinesStatusDlg && m_BackEndConnect == 0 && m_DataBase == 0)
+			pShowLinesStatusDlg->RedrawIcons();
+		break;
+	case CTRL_ID_PBX_TYPE_UI:
+		if (pPBXTypeDlg && m_BackEndConnect == 0 && m_DataBase == 0)
+			pPBXTypeDlg->RedrawIcons();
+		break;
+	case CTRL_ID_CALL_RECORDER_TYPE_UI:
+		if (pCallRecorderDlg && m_BackEndConnect == 0)
+			pCallRecorderDlg->RedrawIcons();
+		break;
+	case CTRL_ID_VOICE_RECORDER_TYPE_UI:
+		if (pVoiceRecorderDlg && m_BackEndConnect == 0 && m_DataBase == 0)
+			pVoiceRecorderDlg->RedrawIcons();
+		break;
+	case CTRL_ID_WEB_CONSOLE_UI:
+		// 內嵌的網頁版控制台跟這支 MFC 程式是各自獨立抓資料的兩個前端，
+		// 使用者可能在瀏覽器分頁改完設定、切回這個分頁時期待看到最新結果，
+		// 所以也跟其他分頁一樣，一回到這個分頁（或整個視窗被切回作用中）
+		// 就重新整理，等同瀏覽器按重新整理鍵。
+		if (pWebConsoleDlg)
+			pWebConsoleDlg->Reload();
+		break;
+	default:
+		break;
+	}
 }
 
 

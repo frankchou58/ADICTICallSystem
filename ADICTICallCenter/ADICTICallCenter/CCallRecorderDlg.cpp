@@ -310,6 +310,24 @@ void CCallRecorderDlg::OnEditSubProgramListItem(NMHDR* pNMHDR, LRESULT* pResult)
 	m_ComboListPortsSelect.ShowWindow(FALSE);
 	if (m_Subitem == ID_LIST_SUB_PROGRAM_OUT_PORTS)
 	{
+		// 防呆：合併機碼互斥規則——這個機碼如果已經被別的類型用掉了（外線或
+		// 內線數量不是 0），這裡直接擋掉，不讓使用者打開下拉選單去改，
+		// 跟後端 PATCH /machines 的驗證規則保持一致，避免選了半天才在儲存時被拒絕。
+		int OccupyingType = 0;
+		if (m_PBXSubProgramGroup[m_Item].OutPortNum > 0 || m_PBXSubProgramGroup[m_Item].ExtPortNum > 0)
+			OccupyingType = MACHINE_TYPE_PBX;
+		else if (m_VoiceCardSubProgramGroup[m_Item].OutPortNum > 0 || m_VoiceCardSubProgramGroup[m_Item].ExtPortNum > 0)
+			OccupyingType = MACHINE_TYPE_VOICE_CARD;
+
+		if (OccupyingType != 0)
+		{
+			CString TypeLabel = (OccupyingType == MACHINE_TYPE_PBX) ? _T("交換機") : _T("語音卡");
+			CString Msg;
+			Msg.Format(_T("合併機碼 %d 目前已經被「%s類型」使用（外線或內線數量不是 0），\r\n請先把%s類型的外線、內線數量都改成 0，才能在這個機碼設定其他類型。"), m_Item + 1, TypeLabel, TypeLabel);
+			MessageBox(Msg, _T("無法設定"), MB_OK | MB_ICONWARNING);
+			return;
+		}
+
 		ListView_GetSubItemRect(m_ListSubProgram, m_Item, m_Subitem, LVIR_BOUNDS, &rect);
 		int Hight = rect.bottom - rect.top;
 		int Width = rect.right - rect.left;
@@ -928,17 +946,24 @@ void CCallRecorderDlg::OnCbnSelchangeComboPortsSelect()
 				}
 				if (Ret == 0)
 				{
-					Ret = m_DatabaseAccessURL.SetMachineOutPortsByMachineID(MACHINE_TYPE_CALLER_ID_BOX, SubProgramID, Ports, NULL);
+					CHAR ErrMsg[200] = { 0 };
+					int FailedPortCount = 0;
+					Ret = m_DatabaseAccessURL.SetMachineOutPortsByMachineID(MACHINE_TYPE_CALLER_ID_BOX, SubProgramID, Ports, ErrMsg, &FailedPortCount);
 					if (Ret == 0)
 					{
 						m_CallerIDSubProgramGroup[m_Item].OutPortNum = Ports;
 						ShowSubProgramList();
 					}
-				}
-				m_PrevCtrlID = 0;
-				int FailedPortCount = SetDBOutVPortSetting(SubProgramID);
-				if (FailedPortCount >= 0)
-				{
+					else
+					{
+						CString Msg;
+						if (ErrMsg[0])
+							Msg = ErrMsg;
+						else
+							Msg = _T("設定外線數量失敗，請確認資料庫連線或聯絡系統管理員。");
+						MessageBox(Msg, _T("設定失敗"), MB_OK | MB_ICONWARNING);
+					}
+
 					LoadMachineData();
 					if (m_DatabaseAccessURL.GetOutLines(m_OutPorts) < 0)
 						m_OutLineNum = 0;
@@ -955,6 +980,7 @@ void CCallRecorderDlg::OnCbnSelchangeComboPortsSelect()
 						MessageBox(Msg, _T("部分外線埠指派失敗"), MB_OK | MB_ICONWARNING);
 					}
 				}
+				m_PrevCtrlID = 0;
 			}
 		}
 		break;

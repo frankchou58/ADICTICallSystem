@@ -283,6 +283,22 @@ table.data-table input:focus {
   background: #fff;
 }
 
+/* 修改被後端拒絕（例如合併機碼互斥規則）時，輸入框閃一下紅色並抖動，
+   提醒使用者畫面已經復原成原本的值，剛剛的輸入並沒有生效。 */
+.field-rejected {
+  animation: field-rejected-shake 0.65s ease;
+}
+
+@keyframes field-rejected-shake {
+  0% { background: #fff; border-color: #ccc; transform: translateX(0); }
+  15% { background: #fdeaea; border-color: #c0392b; transform: translateX(-4px); }
+  30% { transform: translateX(4px); }
+  45% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+  75% { transform: translateX(-1px); background: #fdeaea; border-color: #c0392b; }
+  100% { background: #fff; border-color: transparent; transform: translateX(0); }
+}
+
 .badge {
   display: inline-block;
   padding: 2px 8px;

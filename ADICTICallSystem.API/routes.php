@@ -48,6 +48,7 @@ $router->get('/outline-ports', [OutlinePortController::class, 'index']);
 $router->get('/outline-ports/by-vport/{vport}', [OutlinePortController::class, 'showByVport']);
 $router->get('/outline-ports/{id}', [OutlinePortController::class, 'show']);
 $router->patch('/outline-ports/{id}', [OutlinePortController::class, 'update']);
+$router->delete('/outline-ports/{id}', [OutlinePortController::class, 'destroy']);
 
 // ---- Extline ports (one row per physical internal-line port) --------------
 $router->get('/extline-ports', [ExtlinePortController::class, 'index']);
@@ -55,6 +56,7 @@ $router->get('/extline-ports/by-vport/{vport}', [ExtlinePortController::class, '
 $router->get('/extline-ports/by-ext-num/{machineType}/{machineNo}/{extNum}', [ExtlinePortController::class, 'showByExtNum']);
 $router->get('/extline-ports/{id}', [ExtlinePortController::class, 'show']);
 $router->patch('/extline-ports/{id}', [ExtlinePortController::class, 'update']);
+$router->delete('/extline-ports/{id}', [ExtlinePortController::class, 'destroy']);
 
 // ---- Call records -----------------------------------------------------------
 $router->post('/call-records', [CallRecordController::class, 'create'], [AuthMiddleware::class]);

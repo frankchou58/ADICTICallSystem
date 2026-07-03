@@ -118,6 +118,56 @@ int SetDBOutVPortSetting(int MachineID)
 		}
 	}
 
+	// 清除超出新數量的舊指派：上面的迴圈只會「指派/覆蓋」到新數量涵蓋
+	// 的實體埠，縮減數量時（例如從 8 改成 0）超出新數量的那些舊指派
+	// 完全不會被碰到——資料庫是固定 240 筆的池子，沒有列可以刪，只能
+	// 明確查一次目前實際佈線內容，把超出新數量的實體埠取消指派，畫面
+	// 上的埠號/虛擬編號才會真的消失，不會一直顯示已經不該存在的舊資料。
+	for (int MachineIDIndex = 0; MachineIDIndex < SUBPROGRAM_NUMBERS; MachineIDIndex++)
+	{
+		int WiredPorts[VIRTUAL_PORT_NUMS];
+		int WiredCount = 0;
+
+		if (m_DatabaseAccessURL.GetWiredOutPhyPorts(MACHINE_TYPE_PBX, MachineIDIndex + 1, WiredPorts, VIRTUAL_PORT_NUMS, &WiredCount) == ERROR_CODE_SUCCESS)
+		{
+			for (int w = 0; w < WiredCount; w++)
+			{
+				if (WiredPorts[w] > PBXOutPortNum[MachineIDIndex])
+				{
+					Ret = m_DatabaseAccessURL.UnassignPhyOutPortInfo(MACHINE_TYPE_PBX, MachineIDIndex + 1, WiredPorts[w], NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
+				}
+			}
+		}
+
+		if (m_DatabaseAccessURL.GetWiredOutPhyPorts(MACHINE_TYPE_CALLER_ID_BOX, MachineIDIndex + 1, WiredPorts, VIRTUAL_PORT_NUMS, &WiredCount) == ERROR_CODE_SUCCESS)
+		{
+			for (int w = 0; w < WiredCount; w++)
+			{
+				if (WiredPorts[w] > CallerIDBoxOutPortNum[MachineIDIndex])
+				{
+					Ret = m_DatabaseAccessURL.UnassignPhyOutPortInfo(MACHINE_TYPE_CALLER_ID_BOX, MachineIDIndex + 1, WiredPorts[w], NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
+				}
+			}
+		}
+
+		if (m_DatabaseAccessURL.GetWiredOutPhyPorts(MACHINE_TYPE_VOICE_CARD, MachineIDIndex + 1, WiredPorts, VIRTUAL_PORT_NUMS, &WiredCount) == ERROR_CODE_SUCCESS)
+		{
+			for (int w = 0; w < WiredCount; w++)
+			{
+				if (WiredPorts[w] > VoiceCardOutPortNum[MachineIDIndex])
+				{
+					Ret = m_DatabaseAccessURL.UnassignPhyOutPortInfo(MACHINE_TYPE_VOICE_CARD, MachineIDIndex + 1, WiredPorts[w], NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
+				}
+			}
+		}
+	}
+
 	return FailedCount;
 }
 
@@ -143,6 +193,26 @@ int SetDBExtVPortSetting()
 				if (Ret != ERROR_CODE_SUCCESS)
 					FailedCount++;
 				PortIndex++;
+			}
+		}
+	}
+
+	// 清除超出新數量的舊指派，理由跟 SetDBOutVPortSetting() 裡的同一段一樣。
+	for (int MachineIDIndex = 0; MachineIDIndex < SUBPROGRAM_NUMBERS; MachineIDIndex++)
+	{
+		int WiredPorts[VIRTUAL_PORT_NUMS];
+		int WiredCount = 0;
+
+		if (m_DatabaseAccessURL.GetWiredExtPhyPorts(MachineIDIndex + 1, WiredPorts, VIRTUAL_PORT_NUMS, &WiredCount) == ERROR_CODE_SUCCESS)
+		{
+			for (int w = 0; w < WiredCount; w++)
+			{
+				if (WiredPorts[w] > PBXExtPortNum[MachineIDIndex])
+				{
+					Ret = m_DatabaseAccessURL.UnassignPhyExtPortInfo(MachineIDIndex + 1, WiredPorts[w], NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
+				}
 			}
 		}
 	}

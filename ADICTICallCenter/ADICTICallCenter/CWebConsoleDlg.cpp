@@ -189,6 +189,14 @@ void CWebConsoleDlg::OnSize(UINT nType, int cx, int cy)
 	}
 }
 
+void CWebConsoleDlg::Reload()
+{
+	if (m_WebView != nullptr)
+	{
+		m_WebView->Reload();
+	}
+}
+
 void CWebConsoleDlg::OnDestroy()
 {
 	if (m_WebViewController != nullptr)

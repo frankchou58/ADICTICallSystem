@@ -34,7 +34,16 @@ class ExtlinePortController extends Controller
             return;
         }
 
-        $where = [];
+        // sub_program_id IS NOT NULL 一定要加：dbo.extline 是固定 240 筆
+        // 的池子，沒有真正指派給任何機碼的列永遠都在，不像這支 API 原本
+        // 設計假設的「沒配置的實體埠根本不會是一筆列」。不濾掉的話，前端
+        // (ADICTICallCenter.Web 的機器設定頁)會看到一堆機碼=0 的幽靈列，
+        // 即使 outPortCount/extPortCount 已經改成 0 也還在。這裡刻意用
+        // sub_program_id 而非 phy_port 判斷是否「真的佈線」——實測發現
+        // phy_port 這台資料庫從一開始建立就被批次塞成等於 port_no（240
+        // 筆幾乎全部都有值），只有 sub_program_id 才是真正代表「這個
+        // 實體埠現在有指派給某個機碼」的欄位。
+        $where = ['sub_program_id IS NOT NULL'];
         $params = [];
         foreach (['machineNo' => 'sub_program_id', 'phyPort' => 'phy_port', 'vport' => 'port_no'] as $q => $col) {
             if (isset($request->query[$q]) && $request->query[$q] !== '') {
@@ -43,11 +52,9 @@ class ExtlinePortController extends Controller
             }
         }
 
-        $sql = 'SELECT ID AS id, sub_program_id, phy_port, port_no, ext_no, ext_status FROM dbo.extline';
-        if ($where) {
-            $sql .= ' WHERE ' . implode(' AND ', $where);
-        }
-        $sql .= ' ORDER BY sub_program_id, phy_port';
+        $sql = 'SELECT ID AS id, sub_program_id, phy_port, port_no, ext_no, ext_status FROM dbo.extline
+                WHERE ' . implode(' AND ', $where) . '
+                ORDER BY sub_program_id, phy_port';
 
         $stmt = $this->db()->prepare($sql);
         $stmt->execute($params);
@@ -71,7 +78,7 @@ class ExtlinePortController extends Controller
     {
         $stmt = $this->db()->prepare(
             'SELECT ID AS id, sub_program_id, phy_port, port_no, ext_no, ext_status
-             FROM dbo.extline WHERE port_no = :port_no ORDER BY ID'
+             FROM dbo.extline WHERE port_no = :port_no AND sub_program_id IS NOT NULL ORDER BY ID'
         );
         $stmt->execute(['port_no' => (int) $request->params['vport']]);
         Response::ok(array_map([$this, 'mapRow'], $stmt->fetchAll()));
@@ -147,6 +154,31 @@ class ExtlinePortController extends Controller
         Response::ok(null, '內線埠已更新。');
     }
 
+    /**
+     * DELETE /extline-ports/{id} - unassign this physical port from whichever
+     * machine it currently belongs to (clears sub_program_id/phy_port).
+     * Added 2026-07-03 for the same reason as OutlinePortController::destroy()
+     * - reducing extPortCount used to delete the row outright in this API's
+     * original design; against this customer's fixed 240-row dbo.extline
+     * pool there's nothing to delete, so this clears the machine association
+     * instead. port_no (vport)/ext_no are left as-is - only the physical
+     * wiring to a machine is cleared.
+     */
+    public function destroy(Request $request): void
+    {
+        $id = (int) $request->params['id'];
+
+        $stmt = $this->db()->prepare('UPDATE dbo.extline SET sub_program_id = NULL, phy_port = NULL WHERE ID = :id');
+        $stmt->execute(['id' => $id]);
+
+        if ($stmt->rowCount() === 0) {
+            Response::notFound('找不到這個內線埠。');
+            return;
+        }
+
+        Response::ok(null, '內線埠已取消指派。');
+    }
+
     /** @return array|false */
     private function fetchById(int $id)
     {
@@ -154,7 +186,14 @@ class ExtlinePortController extends Controller
             'SELECT ID AS id, sub_program_id, phy_port, port_no, ext_no, ext_status FROM dbo.extline WHERE ID = :id'
         );
         $stmt->execute(['id' => $id]);
-        return $stmt->fetch();
+        $row = $stmt->fetch();
+
+        // 沒有真正指派給任何機碼(sub_program_id 為 NULL)就當作這個實體
+        // 埠不存在，跟 index()/showByVport() 的過濾邏輯一致。
+        if (!$row || $row['sub_program_id'] === null) {
+            return false;
+        }
+        return $row;
     }
 
     private function mapRow(array $row): array

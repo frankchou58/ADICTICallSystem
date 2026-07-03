@@ -8,6 +8,9 @@
  * 實際設定的實體埠總數，新增/刪除實體埠列是伺服器在 outPortCount/
  * extPortCount 變動時自動處理，這裡只負責顯示與編輯 vport/分機號碼。
  */
+const MACHINE_TYPE_LABEL = { 1: '交換機', 2: '來電盒', 3: '語音卡' };
+const REJECT_FLASH_MS = 650; // 要跟 css/style.css 的 .field-rejected 動畫時間一致
+
 function createMachinesTab(machineType, elIds) {
   const hasExtPorts = machineType === 1;
 
@@ -15,18 +18,45 @@ function createMachinesTab(machineType, elIds) {
     const tbody = document.querySelector(`#${elIds.table} tbody`);
     tbody.innerHTML = '';
     try {
-      const machines = await Api.get('/machines', { machineType });
+      // 抓「全部類型」而不是只抓自己這個 machineType，才能知道同一個
+      // 合併機碼有沒有已經被別的類型占用——後端規則是同一個機碼同時間
+      // 只能有一種類型的外線或內線數量不是 0，這裡先在畫面上做防呆
+      // （鎖住輸入框、顯示提示），不要等使用者按下去才收到後端錯誤。
+      const allMachines = await Api.get('/machines');
+      const byNo = new Map();
+      allMachines.forEach((m) => {
+        if (!byNo.has(m.machineNo)) byNo.set(m.machineNo, []);
+        byNo.get(m.machineNo).push(m);
+      });
+
+      const machines = allMachines.filter((m) => m.machineType === machineType);
       machines.sort((a, b) => a.machineNo - b.machineNo);
       machines.forEach((m) => {
+        const occupiedBy = (byNo.get(m.machineNo) || []).find(
+          (other) => other.machineType !== machineType && (other.outPortCount > 0 || other.extPortCount > 0)
+        );
+        const locked = !!occupiedBy;
+        const lockHint = locked
+          ? `<div class="hint" style="color:#c0392b;">已被${MACHINE_TYPE_LABEL[occupiedBy.machineType]}類型使用，請先將該類型數量歸零</div>`
+          : '';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>${m.machineNo}</td>
           <td><input type="text" value="${m.alias ?? ''}" data-field="alias" /></td>
-          <td><input type="number" min="0" value="${m.outPortCount}" data-field="outPortCount" style="width:70px" /></td>
-          <td>${hasExtPorts ? `<input type="number" min="0" value="${m.extPortCount}" data-field="extPortCount" style="width:70px" />` : '—'}</td>
+          <td>
+            <input type="number" min="0" value="${m.outPortCount}" data-field="outPortCount" style="width:70px" ${locked ? 'disabled' : ''} />
+            ${lockHint}
+          </td>
+          <td>${hasExtPorts ? `<input type="number" min="0" value="${m.extPortCount}" data-field="extPortCount" style="width:70px" ${locked ? 'disabled' : ''} />` : '—'}</td>
           <td><span class="badge ${m.isConnected ? 'on' : 'off'}">${m.isConnected ? '已連線' : '未連線'}</span></td>
         `;
         tr.querySelectorAll('input').forEach((input) => {
+          // 存下目前這個值，PATCH 被後端拒絕時（例如互斥規則）要把畫面
+          // 復原成這個值，而不是留著使用者剛剛打的、其實沒有生效的數字。
+          input.dataset.original = input.value;
+        });
+        tr.querySelectorAll('input:not([disabled])').forEach((input) => {
           input.addEventListener('change', () => saveMachineField(m.machineNo, input.dataset.field, input));
         });
         tbody.appendChild(tr);
@@ -36,16 +66,37 @@ function createMachinesTab(machineType, elIds) {
     }
   }
 
+  function flashRejected(input) {
+    input.classList.remove('field-rejected');
+    // 強制重排一次讓動畫可以重新觸發（同一個元素連續兩次失敗也要有效果）
+    void input.offsetWidth;
+    input.classList.add('field-rejected');
+    input.addEventListener('animationend', () => input.classList.remove('field-rejected'), { once: true });
+  }
+
   async function saveMachineField(machineNo, field, input) {
     const value = field === 'alias' ? input.value : Number(input.value);
+    const previousValue = input.dataset.original ?? '';
     try {
       await Api.patch(`/machines/${machineType}/${machineNo}`, { [field]: value });
       Ui.toast('已更新');
+      input.dataset.original = input.value;
       if (field === 'outPortCount' || field === 'extPortCount') {
         loadPortList();
+        // 數量變動可能讓別的類型被鎖住/解鎖，重新整理讓鎖定提示跟資料庫同步。
+        loadMachineTable();
       }
     } catch (err) {
       Ui.handleError(err);
+      // 後端拒絕了這次修改（例如合併機碼互斥規則）：把輸入框復原成修改前
+      // 的值並閃一下紅色，讓使用者清楚知道剛剛的輸入沒有生效——不然只看
+      // 右下角一閃即逝的 toast，很容易誤以為數字已經改成功了。
+      input.value = previousValue;
+      flashRejected(input);
+      if (field === 'outPortCount' || field === 'extPortCount') {
+        // 等紅色閃爍動畫播完再整個重畫表格，不然畫面會被重畫打斷、看不到效果。
+        setTimeout(() => loadMachineTable(), REJECT_FLASH_MS);
+      }
     }
   }
 
@@ -150,14 +201,15 @@ function createMachinesTab(machineType, elIds) {
     container.appendChild(table);
   }
 
-  function init() {
+  function refresh() {
     loadMachineTable();
     loadPortList();
-    document.getElementById(elIds.refreshBtn).addEventListener('click', () => {
-      loadMachineTable();
-      loadPortList();
-    });
   }
 
-  return { init };
+  function init() {
+    refresh();
+    document.getElementById(elIds.refreshBtn).addEventListener('click', refresh);
+  }
+
+  return { init, refresh };
 }
