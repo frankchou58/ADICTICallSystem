@@ -1,4 +1,4 @@
-#include "pch.h"
+﻿#include "pch.h"
 #include "VirtualOutPortDBAccess.h"
 
 static int PBXOutPortNum[SUBPROGRAM_NUMBERS];
@@ -24,6 +24,10 @@ static int LoadMachinePorts()
 	return 0;
 }
 
+// 傳回值：0 = 全部指派成功；>0 = 有幾個實體埠指派失敗（該埠在資料庫裡
+// 沒有對應的既有佈線資料，遷移後的資料庫只能搬動已存在的埠，沒辦法
+// 憑空生出新的實體埠對應——常見於外線/內線數量設定超過客戶原本佈線
+// 涵蓋的實體埠數）；-1 = 連機碼資料都讀不到，整個流程沒執行。
 int SetDBOutVPortSetting(int MachineID)
 {
 	CDatabaseAccessURL m_DatabaseAccessURL;
@@ -32,10 +36,11 @@ int SetDBOutVPortSetting(int MachineID)
 	{
 		return -1;
 	}
-	/*�ھ�Machine����ƭ��s�]�w�~�u��Ʈw���e*/
+	/*根據Machine的資料重新設定外線資料庫內容*/
 	int PortNums = GetDBOutVPortNums();
 	int PortIndex = 1;
 	int Ret;
+	int FailedCount = 0;
 	for (int MachineIDIndex = 0; MachineIDIndex < SUBPROGRAM_NUMBERS; MachineIDIndex++)
 	{
 		if (PBXOutPortNum[MachineIDIndex] > 0)
@@ -43,12 +48,16 @@ int SetDBOutVPortSetting(int MachineID)
 			for (int PhyPort = 1; PhyPort <= PBXOutPortNum[MachineIDIndex]; PhyPort++)
 			{
 				Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_PBX, MachineIDIndex + 1, PhyPort, NULL);
+				if (Ret != ERROR_CODE_SUCCESS)
+					FailedCount++;
 				if (CallerIDBoxOutPortNum[MachineIDIndex] >= 0 && MachineIDIndex == MachineID - 1)
 				{
 					if (PhyPort <= CallerIDBoxOutPortNum[MachineIDIndex])
 						Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_CALLER_ID_BOX, MachineIDIndex + 1, PhyPort, NULL);
 					else
 						Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_CALLER_ID_BOX, MachineIDIndex + 1, 0, NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
 				}
 				if (VoiceCardOutPortNum[MachineIDIndex] >= 0 && MachineIDIndex == MachineID - 1)
 				{
@@ -56,6 +65,8 @@ int SetDBOutVPortSetting(int MachineID)
 						Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_VOICE_CARD, MachineIDIndex + 1, PhyPort, NULL);
 					else
 						Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_VOICE_CARD, MachineIDIndex + 1, 0, NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
 				}
 				PortIndex++;
 			}
@@ -67,7 +78,11 @@ int SetDBOutVPortSetting(int MachineID)
 				for (int PhyPort = 1; PhyPort <= CallerIDBoxOutPortNum[MachineIDIndex]; PhyPort++)
 				{
 					Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_CALLER_ID_BOX, MachineIDIndex + 1, PhyPort, NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
 					Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_PBX, MachineIDIndex + 1, 0, NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
 					PortIndex++;
 				}
 			}
@@ -76,7 +91,11 @@ int SetDBOutVPortSetting(int MachineID)
 				for (int PhyPort = 1; PhyPort <= VoiceCardOutPortNum[MachineIDIndex]; PhyPort++)
 				{
 					Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_VOICE_CARD, MachineIDIndex + 1, PhyPort, NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
 					Ret = m_DatabaseAccessURL.AssignPhyOutPortInfo(PortIndex, MACHINE_TYPE_PBX, MachineIDIndex + 1, 0, NULL);
+					if (Ret != ERROR_CODE_SUCCESS)
+						FailedCount++;
 					PortIndex++;
 				}
 			}
@@ -99,18 +118,21 @@ int SetDBOutVPortSetting(int MachineID)
 		}
 	}
 
-	return 0;
+	return FailedCount;
 }
 
+// 傳回值同 SetDBOutVPortSetting()：0 = 全部成功，>0 = 有幾個實體內線埠
+// 指派失敗（同樣是因為遷移後的資料庫只能搬動既有佈線，沒辦法新增）。
 int SetDBExtVPortSetting()
 {
 	CDatabaseAccessURL m_DatabaseAccessURL;
 
 	LoadMachinePorts();
-	/*�ھ�Machine����ƭ��s�]�w�~�u��Ʈw���e*/
+	/*根據Machine的資料重新設定外線資料庫內容*/
 	int PortNums = GetDBExtVPortNums();
 	int PortIndex = 1;
 	int Ret;
+	int FailedCount = 0;
 	for (int MachineIDIndex = 0; MachineIDIndex < SUBPROGRAM_NUMBERS; MachineIDIndex++)
 	{
 		if (PBXExtPortNum[MachineIDIndex] > 0)
@@ -118,6 +140,8 @@ int SetDBExtVPortSetting()
 			for (int PhyPort = 1; PhyPort <= PBXExtPortNum[MachineIDIndex]; PhyPort++)
 			{
 				Ret = m_DatabaseAccessURL.AssignPhyExtPortInfo(PortIndex, MachineIDIndex + 1, PhyPort, NULL);
+				if (Ret != ERROR_CODE_SUCCESS)
+					FailedCount++;
 				PortIndex++;
 			}
 		}
@@ -141,7 +165,7 @@ int SetDBExtVPortSetting()
 	}
 #endif
 
-	return 0;
+	return FailedCount;
 }
 
 int GetDBOutVPortNums()

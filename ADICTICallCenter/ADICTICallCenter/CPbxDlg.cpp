@@ -750,7 +750,16 @@ void CPbxDlg::OnCbnSelchangeComboPortsSelect()
 					/*設定外線資料庫*/
 					m_PBXSubProgramGroup[m_Item].OutPortNum = Ports;
 					ShowSubProgramList();
-					SetDBOutVPortSetting(0);
+					int FailedPortCount = SetDBOutVPortSetting(0);
+					if (FailedPortCount > 0)
+					{
+						// 這台部署的資料庫只能搬動既有佈線的實體埠，沒辦法
+						// 憑空新增——超過既有佈線涵蓋範圍的埠，指派會失敗但
+						// 畫面不會有任何提示，這裡明確告知管理員。
+						CString Msg;
+						Msg.Format(_T("有 %d 個實體外線埠指派失敗：這幾個實體埠在資料庫裡沒有既有佈線資料，無法自動指派虛擬線路，請聯絡系統管理員確認資料庫佈線。"), FailedPortCount);
+						MessageBox(Msg, _T("部分外線埠指派失敗"), MB_OK | MB_ICONWARNING);
+					}
 				}
 			}
 		}
@@ -760,13 +769,19 @@ void CPbxDlg::OnCbnSelchangeComboPortsSelect()
 		if (Ret == 0)
 		{
 			m_PBXSubProgramGroup[m_Item].ExtPortNum = Ports;
-			SetDBExtVPortSetting();
+			int FailedExtPortCount = SetDBExtVPortSetting();
 			LoadMachineData();
 			m_DatabaseAccessURL.GetExtLines(m_ExtPorts);
 			ShowSubProgramList();
 			SetExtLineFont();
 			ShowExtLineIcon();
 			Invalidate(FALSE);
+			if (FailedExtPortCount > 0)
+			{
+				CString Msg;
+				Msg.Format(_T("有 %d 個實體內線埠指派失敗：這幾個實體埠在資料庫裡沒有既有佈線資料，無法自動指派虛擬線路，請聯絡系統管理員確認資料庫佈線。"), FailedExtPortCount);
+				MessageBox(Msg, _T("部分內線埠指派失敗"), MB_OK | MB_ICONWARNING);
+			}
 		}
 		break;
 	}

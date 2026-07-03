@@ -934,6 +934,22 @@ void CVoiceRecorderDlg::OnCbnSelchangeComboPotportsAssign()
 		if (m_DatabaseAccessURL.GetOutLines(m_OutPorts) < 0)
 			m_OutLineNum = 0;
 	}
+	else
+	{
+		// 指派失敗：這台部署的資料庫只能搬動既有佈線的實體埠，選到一個
+		// 沒有既有佈線資料的埠號就會失敗。上面已經先把選到的埠號寫進
+		// 編輯框（畫面看起來像是成功了），這裡明確告知失敗，並用
+		// GetOutLines 重新讀回資料庫實際內容蓋掉那個沒有真的存進去的
+		// 顯示值，避免畫面跟資料庫不一致。
+		CString Msg;
+		Msg.Format(_T("指派實體埠 %d 失敗：這個埠在資料庫裡沒有既有佈線資料，無法指派。"), Ports);
+		MessageBox(Msg, _T("指派失敗"), MB_OK | MB_ICONWARNING);
+		if (m_DatabaseAccessURL.GetOutLines(m_OutPorts) < 0)
+			m_OutLineNum = 0;
+		SetOutLineFont();
+		ShowOutLineIcon();
+		Invalidate(FALSE);
+	}
 }
 
 
@@ -998,7 +1014,8 @@ void CVoiceRecorderDlg::OnCbnSelchangeComboPortsSelect()
 					}
 				}
 				m_PrevCtrlID = 0;
-				if (SetDBOutVPortSetting(SubProgramID) >= 0)
+				int FailedPortCount = SetDBOutVPortSetting(SubProgramID);
+				if (FailedPortCount >= 0)
 				{
 					LoadMachineData();
 					if (m_DatabaseAccessURL.GetOutLines(m_OutPorts) < 0)
@@ -1006,6 +1023,15 @@ void CVoiceRecorderDlg::OnCbnSelchangeComboPortsSelect()
 					SetOutLineFont();
 					ShowOutLineIcon();
 					Invalidate(false);
+					if (FailedPortCount > 0)
+					{
+						// 這台部署的資料庫只能搬動既有佈線的實體埠，沒辦法
+						// 憑空新增——超過既有佈線涵蓋範圍的埠，指派會失敗但
+						// 畫面不會有任何提示，這裡明確告知管理員。
+						CString Msg;
+						Msg.Format(_T("有 %d 個實體外線埠指派失敗：這幾個實體埠在資料庫裡沒有既有佈線資料，無法自動指派虛擬線路，請聯絡系統管理員確認資料庫佈線。"), FailedPortCount);
+						MessageBox(Msg, _T("部分外線埠指派失敗"), MB_OK | MB_ICONWARNING);
+					}
 				}
 			}
 		}
