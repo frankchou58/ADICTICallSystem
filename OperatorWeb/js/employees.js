@@ -1,16 +1,16 @@
-/** 員工管理（僅 admin 看得到這個分頁）：列表、新增、編輯、座位機碼指派（machineMask，控制外線看板可見範圍）、虛擬內線指派。 */
+/**
+ * 員工管理（僅 admin 看得到這個分頁）：列表、新增、編輯、座位機碼指派
+ * （machineMask，控制外線看板可見範圍）。
+ *
+ * 2026-07-03：拿掉了虛擬內線指派（employee_ext_lines）——這台部署的
+ * 資料庫不能新增資料表，見 doc/ADICTICallSystem.API-說明書.md。
+ */
 const EmployeesTab = (() => {
   async function loadTable() {
     const tbody = document.querySelector('#empTable tbody');
-    tbody.innerHTML = '<tr><td colspan="9">載入中...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">載入中...</td></tr>';
     try {
-      const [employees, extPorts] = await Promise.all([
-        Api.get('/employees'),
-        Api.get('/extline-ports'),
-      ]);
-      const vports = Array.from(new Set(
-        extPorts.map((p) => p.vport).filter((v) => v !== null && v !== undefined)
-      )).sort((a, b) => a - b);
+      const employees = await Api.get('/employees');
 
       tbody.innerHTML = '';
       employees.forEach((emp) => {
@@ -20,12 +20,6 @@ const EmployeesTab = (() => {
           const checked = (machineMask & (1 << (machineNo - 1))) !== 0;
           return `<label style="margin-right:6px;"><input type="checkbox" data-machine-no="${machineNo}" ${checked ? 'checked' : ''} />${machineNo}</label>`;
         }).join('');
-        const extLineCheckboxes = vports.length
-          ? vports.map((vport) => {
-              const checked = (emp.extVports || []).includes(vport);
-              return `<label style="margin-right:6px;"><input type="checkbox" data-ext-vport="${vport}" ${checked ? 'checked' : ''} />${vport}</label>`;
-            }).join('')
-          : '(尚無虛擬內線資料)';
         tr.innerHTML = `
           <td>${emp.id}</td>
           <td>${emp.employeeNo}</td>
@@ -39,7 +33,6 @@ const EmployeesTab = (() => {
           </td>
           <td><input type="text" value="${emp.extNum ?? ''}" data-field="extNum" style="width:70px" /></td>
           <td class="machine-mask">${machineCheckboxes}</td>
-          <td class="ext-line-mask">${extLineCheckboxes}</td>
           <td><input type="checkbox" data-field="isDisabled" ${emp.isDisabled ? 'checked' : ''} /></td>
           <td><button class="secondary" data-action="password">改密碼</button></td>
         `;
@@ -50,15 +43,12 @@ const EmployeesTab = (() => {
         tr.querySelectorAll('input[data-machine-no]').forEach((cb) => {
           cb.addEventListener('change', () => toggleMachine(emp.id, cb));
         });
-        tr.querySelectorAll('input[data-ext-vport]').forEach((cb) => {
-          cb.addEventListener('change', () => toggleExtLine(emp.id, cb));
-        });
         tr.querySelector('button[data-action="password"]').addEventListener('click', () => openPasswordModal(emp));
         tbody.appendChild(tr);
       });
     } catch (err) {
       Ui.handleError(err);
-      tbody.innerHTML = '<tr><td colspan="9">載入失敗</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8">載入失敗</td></tr>';
     }
   }
 
@@ -83,21 +73,6 @@ const EmployeesTab = (() => {
         await Api.del(`/employees/${id}/machines/${machineNo}`);
       }
       Ui.toast('已更新座位機碼指派');
-    } catch (err) {
-      Ui.handleError(err);
-      checkbox.checked = !checkbox.checked;
-    }
-  }
-
-  async function toggleExtLine(id, checkbox) {
-    const vport = Number(checkbox.dataset.extVport);
-    try {
-      if (checkbox.checked) {
-        await Api.post(`/employees/${id}/ext-lines/${vport}`);
-      } else {
-        await Api.del(`/employees/${id}/ext-lines/${vport}`);
-      }
-      Ui.toast('已更新虛擬內線指派');
     } catch (err) {
       Ui.handleError(err);
       checkbox.checked = !checkbox.checked;

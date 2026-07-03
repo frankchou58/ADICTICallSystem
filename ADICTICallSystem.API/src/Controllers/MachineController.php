@@ -8,20 +8,21 @@ use App\Core\Response;
 use App\Core\ValidationException;
 
 /**
- * Sub-machine slots: machineType 1 = PBX, 2 = CallerID Box, 3 = Voice Card;
- * machineNo is the 1-10 "合併機碼". Per clarified requirements, any
- * combination of machine types (including all three at once) is allowed
- * at the same machineNo, each independently configurable - there is no
- * cross-type port-count validation. The one remaining rule: only PBX
- * (type 1) may have extension ports, since only PBX has FXO/FXS internal
- * line capability.
+ * 2026-07-03: rewritten against the customer's pre-existing ADICTICallCenter
+ * database's dbo.machine table (machine_type 1=PBX/2=CallerID Box/3=Voice
+ * Card, machine_id is the 1-10 slot number - all 30 combinations are
+ * pre-seeded rows, confirmed against the legacy PHP source in D:\ADICTICallSystem\API).
  *
- * When out_port_count/ext_port_count changes, this controller keeps
- * dbo.outline_ports / dbo.extline_ports in sync: growing a count inserts
- * new physical-port rows (vport left unassigned), shrinking it removes
- * the phy ports beyond the new count. The vport "pool" is therefore
- * exactly as large as the sum of actual configured physical ports -
- * there's no fixed pre-allocated ceiling.
+ * Unlike this API's original design (where out_port_count/ext_port_count
+ * changes drove creating/deleting rows in dbo.outline_ports/extline_ports),
+ * this customer's dbo.outline/dbo.extline are a FIXED pool of 240 rows each
+ * that already exist independently of any machine's port counts - the
+ * counts here are purely descriptive (matches the legacy app's own
+ * behaviour: nothing in the ~65 old endpoint files ever kept them in sync
+ * with actual outline/extline row assignments either). So there is no
+ * port-syncing side effect here anymore - admins assign which physical
+ * outline/extline row belongs to which machine slot directly via
+ * OutlinePortController/ExtlinePortController.
  */
 class MachineController extends Controller
 {
@@ -37,16 +38,24 @@ class MachineController extends Controller
             $params['machine_type'] = (int) $type;
         }
         if ($no = $request->query['machineNo'] ?? null) {
-            $where[] = 'machine_no = :machine_no';
+            $where[] = 'machine_id = :machine_no';
             $params['machine_no'] = (int) $no;
         }
 
-        $sql = 'SELECT machine_type, machine_no, alias, out_port_count, ext_port_count, ip_address, sw_version, is_connected, last_seen_at
-                FROM dbo.machines';
+        // RTRIM(alias) is load-bearing, not cosmetic: PDO_ODBC silently
+        // returns NULL (not an error) when fetching this NCHAR(50) column
+        // directly if it holds non-ASCII content padded out to its full
+        // fixed width - confirmed by comparing against a raw DATALENGTH()
+        // check on the same row, which still showed real bytes stored.
+        // Plain-ASCII content in the same column fetches fine either way;
+        // only wide/space-padded values trigger it. RTRIM shortens what
+        // crosses the driver boundary and avoids the bug entirely.
+        $sql = 'SELECT machine_type, machine_id, RTRIM(alias) AS alias, out_port_num, ext_port_num, ip_address, sw_version, is_connected, last_seen_at
+                FROM dbo.machine';
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY machine_type, machine_no';
+        $sql .= ' ORDER BY machine_type, machine_id';
 
         $stmt = $this->db()->prepare($sql);
         $stmt->execute($params);
@@ -80,8 +89,6 @@ class MachineController extends Controller
 
         $fields = [];
         $params = ['machine_type' => $machineType, 'machine_no' => $machineNo];
-        $newOutPorts = null;
-        $newExtPorts = null;
 
         if (($alias = $request->input('alias')) !== null) {
             $fields[] = 'alias = :alias';
@@ -93,8 +100,8 @@ class MachineController extends Controller
             if ($newOutPorts < 0) {
                 throw new ValidationException('outPortCount 不能是負數。');
             }
-            $fields[] = 'out_port_count = :out_port_count';
-            $params['out_port_count'] = $newOutPorts;
+            $fields[] = 'out_port_num = :out_port_num';
+            $params['out_port_num'] = $newOutPorts;
         }
 
         if (($extPorts = $request->input('extPortCount')) !== null) {
@@ -105,8 +112,8 @@ class MachineController extends Controller
             if ($machineType !== 1 && $newExtPorts > 0) {
                 throw new ValidationException('只有 machineType 1（電話總機）支援內線埠。');
             }
-            $fields[] = 'ext_port_count = :ext_port_count';
-            $params['ext_port_count'] = $newExtPorts;
+            $fields[] = 'ext_port_num = :ext_port_num';
+            $params['ext_port_num'] = $newExtPorts;
         }
 
         // Sent by the MFC Main Core's MachineLogin()/MachineLogout() handlers
@@ -128,8 +135,8 @@ class MachineController extends Controller
             throw new ValidationException('沒有提供任何可更新的欄位。');
         }
 
-        $sql = 'UPDATE dbo.machines SET ' . implode(', ', $fields) . '
-                WHERE machine_type = :machine_type AND machine_no = :machine_no';
+        $sql = 'UPDATE dbo.machine SET ' . implode(', ', $fields) . '
+                WHERE machine_type = :machine_type AND machine_id = :machine_no';
         $stmt = $this->db()->prepare($sql);
         $this->executeWithParams($stmt, $params, ['alias']);
 
@@ -138,58 +145,15 @@ class MachineController extends Controller
             return;
         }
 
-        if ($newOutPorts !== null) {
-            $this->syncPorts('outline_ports', $machineType, $machineNo, $newOutPorts);
-        }
-        if ($newExtPorts !== null) {
-            $this->syncPorts('extline_ports', $machineType, $machineNo, $newExtPorts);
-        }
-
         Response::ok(null, '機器資料已更新。');
-    }
-
-    /**
-     * Grows or shrinks the physical-port rows for one (machineType, machineNo)
-     * in the given ports table so they exactly match $newCount rows
-     * (phy_port 1..$newCount). New rows are auto-assigned the next
-     * available vport in that table; shrinking simply deletes the rows
-     * for phy ports beyond the new count (including any that already had
-     * a vport/ext assignment - matches the legacy MFC UI's behavior of
-     * warning that shrinking a count changes the physical/virtual mapping
-     * but proceeding anyway).
-     */
-    private function syncPorts(string $table, int $machineType, int $machineNo, int $newCount): void
-    {
-        $db = $this->db();
-
-        $stmt = $db->prepare("SELECT MAX(phy_port) AS max_phy FROM dbo.$table WHERE machine_type = :t AND machine_no = :n");
-        $stmt->execute(['t' => $machineType, 'n' => $machineNo]);
-        $currentMax = (int) ($stmt->fetchColumn() ?: 0);
-
-        if ($newCount > $currentMax) {
-            $vportStmt = $db->prepare("SELECT MAX(vport) AS max_vport FROM dbo.$table");
-            $vportStmt->execute();
-            $nextVport = (int) ($vportStmt->fetchColumn() ?: 0) + 1;
-
-            $insert = $db->prepare(
-                "INSERT INTO dbo.$table (machine_type, machine_no, phy_port, vport) VALUES (:t, :n, :p, :v)"
-            );
-            for ($phyPort = $currentMax + 1; $phyPort <= $newCount; $phyPort++) {
-                $insert->execute(['t' => $machineType, 'n' => $machineNo, 'p' => $phyPort, 'v' => $nextVport]);
-                $nextVport++;
-            }
-        } elseif ($newCount < $currentMax) {
-            $delete = $db->prepare("DELETE FROM dbo.$table WHERE machine_type = :t AND machine_no = :n AND phy_port > :max");
-            $delete->execute(['t' => $machineType, 'n' => $machineNo, 'max' => $newCount]);
-        }
     }
 
     /** @return array|false */
     private function fetchOne(int $machineType, int $machineNo)
     {
         $stmt = $this->db()->prepare(
-            'SELECT machine_type, machine_no, alias, out_port_count, ext_port_count, ip_address, sw_version, is_connected, last_seen_at
-             FROM dbo.machines WHERE machine_type = :machine_type AND machine_no = :machine_no'
+            'SELECT machine_type, machine_id, RTRIM(alias) AS alias, out_port_num, ext_port_num, ip_address, sw_version, is_connected, last_seen_at
+             FROM dbo.machine WHERE machine_type = :machine_type AND machine_id = :machine_no'
         );
         $stmt->execute(['machine_type' => $machineType, 'machine_no' => $machineNo]);
         return $stmt->fetch();
@@ -199,10 +163,12 @@ class MachineController extends Controller
     {
         return [
             'machineType' => (int) $row['machine_type'],
-            'machineNo' => (int) $row['machine_no'],
-            'alias' => Database::decodeText($row['alias']),
-            'outPortCount' => (int) $row['out_port_count'],
-            'extPortCount' => (int) $row['ext_port_count'],
+            'machineNo' => (int) $row['machine_id'],
+            // Already RTRIM()'d in SQL (see index()/fetchOne()'s query) -
+            // that's load-bearing there, not just cosmetic padding removal.
+            'alias' => $row['alias'] !== null ? Database::decodeText($row['alias']) : null,
+            'outPortCount' => (int) $row['out_port_num'],
+            'extPortCount' => (int) $row['ext_port_num'],
             'ipAddress' => $row['ip_address'],
             'swVersion' => $row['sw_version'],
             'isConnected' => (bool) $row['is_connected'],

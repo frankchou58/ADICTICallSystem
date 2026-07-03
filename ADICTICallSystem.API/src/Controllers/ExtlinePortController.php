@@ -7,31 +7,47 @@ use App\Core\Response;
 use App\Core\ValidationException;
 
 /**
- * One row per physical internal-line port (machineType, machineNo, phyPort).
- * In practice machineType is always 1 (PBX) since only PBX has extension
- * ports, but the table doesn't hard-code that assumption. `vport` is the
- * shared virtual extension-line number; rows are created/removed by
- * MachineController when a machine's extPortCount changes.
+ * 2026-07-03: rewritten against the customer's pre-existing ADICTICallCenter
+ * database's dbo.extline table - unlike dbo.outline, this one already is a
+ * fixed pool of 240 rows shaped one-row-per-physical-port (port_no is the
+ * vport, phy_port is the physical port, sub_program_id is the machine slot),
+ * so the mapping onto this API's original "one row per physical port"
+ * contract is direct - no id-encoding tricks needed. machineType is always
+ * hard-coded to 1 (PBX) since only PBX has extension ports (matches the
+ * legacy code, which never varies it either).
+ *
+ * `currentEmployeeId` is always returned as null: the legacy column that
+ * would map to it, operator_uuid (a CHAR(33) uuid, not an int id), was
+ * never populated by any endpoint in the old system (see
+ * doc/ADICTICallSystem.API-說明書.md's legacy-schema research notes) and
+ * isn't the right data type to hold an operators.ID value anyway.
  */
 class ExtlinePortController extends Controller
 {
+    private const MACHINE_TYPE_PBX = 1;
+
     /** GET /extline-ports?machineType=&machineNo=&phyPort=&vport= */
     public function index(Request $request): void
     {
+        if (isset($request->query['machineType']) && $request->query['machineType'] !== '' && (int) $request->query['machineType'] !== self::MACHINE_TYPE_PBX) {
+            Response::ok([]);
+            return;
+        }
+
         $where = [];
         $params = [];
-        foreach (['machineType' => 'machine_type', 'machineNo' => 'machine_no', 'phyPort' => 'phy_port', 'vport' => 'vport'] as $q => $col) {
+        foreach (['machineNo' => 'sub_program_id', 'phyPort' => 'phy_port', 'vport' => 'port_no'] as $q => $col) {
             if (isset($request->query[$q]) && $request->query[$q] !== '') {
                 $where[] = "$col = :$col";
                 $params[$col] = (int) $request->query[$q];
             }
         }
 
-        $sql = 'SELECT id, machine_type, machine_no, phy_port, vport, ext_num, status, current_employee_id FROM dbo.extline_ports';
+        $sql = 'SELECT ID AS id, sub_program_id, phy_port, port_no, ext_no, ext_status FROM dbo.extline';
         if ($where) {
             $sql .= ' WHERE ' . implode(' AND ', $where);
         }
-        $sql .= ' ORDER BY machine_type, machine_no, phy_port';
+        $sql .= ' ORDER BY sub_program_id, phy_port';
 
         $stmt = $this->db()->prepare($sql);
         $stmt->execute($params);
@@ -54,24 +70,28 @@ class ExtlinePortController extends Controller
     public function showByVport(Request $request): void
     {
         $stmt = $this->db()->prepare(
-            'SELECT id, machine_type, machine_no, phy_port, vport, ext_num, status, current_employee_id
-             FROM dbo.extline_ports WHERE vport = :vport ORDER BY machine_type'
+            'SELECT ID AS id, sub_program_id, phy_port, port_no, ext_no, ext_status
+             FROM dbo.extline WHERE port_no = :port_no ORDER BY ID'
         );
-        $stmt->execute(['vport' => (int) $request->params['vport']]);
+        $stmt->execute(['port_no' => (int) $request->params['vport']]);
         Response::ok(array_map([$this, 'mapRow'], $stmt->fetchAll()));
     }
 
     /** GET /extline-ports/by-ext-num/{machineType}/{machineNo}/{extNum} */
     public function showByExtNum(Request $request): void
     {
+        if ((int) $request->params['machineType'] !== self::MACHINE_TYPE_PBX) {
+            Response::notFound('找不到這個內線埠。');
+            return;
+        }
+
         $stmt = $this->db()->prepare(
-            'SELECT id, machine_type, machine_no, phy_port, vport, ext_num, status, current_employee_id
-             FROM dbo.extline_ports WHERE machine_type = :machine_type AND machine_no = :machine_no AND ext_num = :ext_num'
+            'SELECT ID AS id, sub_program_id, phy_port, port_no, ext_no, ext_status
+             FROM dbo.extline WHERE sub_program_id = :sub_program_id AND ext_no = :ext_no'
         );
         $stmt->execute([
-            'machine_type' => (int) $request->params['machineType'],
-            'machine_no' => (int) $request->params['machineNo'],
-            'ext_num' => (int) $request->params['extNum'],
+            'sub_program_id' => (int) $request->params['machineNo'],
+            'ext_no' => (int) $request->params['extNum'],
         ]);
         $row = $stmt->fetch();
 
@@ -90,23 +110,23 @@ class ExtlinePortController extends Controller
         $params = ['id' => $id];
 
         if (($vport = $request->input('vport')) !== null) {
-            $fields[] = 'vport = :vport';
-            $params['vport'] = (int) $vport;
+            $fields[] = 'port_no = :port_no';
+            $params['port_no'] = (int) $vport;
         }
         if (($extNum = $request->input('extNum')) !== null) {
-            $fields[] = 'ext_num = :ext_num';
-            $params['ext_num'] = (int) $extNum;
+            $fields[] = 'ext_no = :ext_no';
+            $params['ext_no'] = (int) $extNum;
         }
         if (($status = $request->input('status')) !== null) {
-            $fields[] = 'status = :status';
-            $params['status'] = (int) $status;
+            $fields[] = 'ext_status = :ext_status';
+            $params['ext_status'] = (int) $status;
         }
 
         if (empty($fields)) {
             throw new ValidationException('沒有提供任何可更新的欄位。');
         }
 
-        $sql = 'UPDATE dbo.extline_ports SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $sql = 'UPDATE dbo.extline SET ' . implode(', ', $fields) . ' WHERE ID = :id';
         $stmt = $this->db()->prepare($sql);
 
         try {
@@ -131,7 +151,7 @@ class ExtlinePortController extends Controller
     private function fetchById(int $id)
     {
         $stmt = $this->db()->prepare(
-            'SELECT id, machine_type, machine_no, phy_port, vport, ext_num, status, current_employee_id FROM dbo.extline_ports WHERE id = :id'
+            'SELECT ID AS id, sub_program_id, phy_port, port_no, ext_no, ext_status FROM dbo.extline WHERE ID = :id'
         );
         $stmt->execute(['id' => $id]);
         return $stmt->fetch();
@@ -141,13 +161,13 @@ class ExtlinePortController extends Controller
     {
         return [
             'id' => (int) $row['id'],
-            'machineType' => (int) $row['machine_type'],
-            'machineNo' => (int) $row['machine_no'],
+            'machineType' => self::MACHINE_TYPE_PBX,
+            'machineNo' => $row['sub_program_id'] !== null ? (int) $row['sub_program_id'] : 0,
             'phyPort' => (int) $row['phy_port'],
-            'vport' => $row['vport'] !== null ? (int) $row['vport'] : null,
-            'extNum' => $row['ext_num'] !== null ? (int) $row['ext_num'] : null,
-            'status' => (int) $row['status'],
-            'currentEmployeeId' => $row['current_employee_id'] !== null ? (int) $row['current_employee_id'] : null,
+            'vport' => $row['port_no'] !== null ? (int) $row['port_no'] : null,
+            'extNum' => $row['ext_no'] !== null ? (int) $row['ext_no'] : null,
+            'status' => (int) $row['ext_status'],
+            'currentEmployeeId' => null,
         ];
     }
 }

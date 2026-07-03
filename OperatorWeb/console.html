@@ -22,7 +22,6 @@
     <button class="tab-btn" data-tab="inbound">來電報表</button>
     <button class="tab-btn" data-tab="extension">分機設定</button>
     <button class="tab-btn admin-only" data-tab="employees" style="display:none;">員工管理</button>
-    <button class="tab-btn admin-only" data-tab="customers" style="display:none;">客戶管理</button>
   </div>
 
   <!-- 即時通話看板 -->
@@ -35,7 +34,6 @@
       <span><i style="background:#FFC9C9"></i>撥入</span>
       <span><i style="background:#FFFFBC"></i>撥出</span>
       <span><i style="background:#82FF82"></i>通話中</span>
-      <span><i style="background:#000000"></i>黑名單來電</span>
     </div>
     <div class="board-grid" id="boardGrid"></div>
 
@@ -78,8 +76,6 @@
       <input type="date" id="ibStartDate" />
       <input type="date" id="ibEndDate" />
       <input type="text" id="ibTel" placeholder="電話號碼" style="width:140px;" />
-      <input type="text" id="ibName" placeholder="客戶姓名" style="width:120px;" />
-      <input type="text" id="ibAddr" placeholder="地址關鍵字" style="width:140px;" />
       <select id="ibStatus">
         <option value="">全部狀態</option>
         <option value="answered">來電接聽</option>
@@ -92,7 +88,7 @@
     <table class="data-table" id="ibTable">
       <thead>
         <tr>
-          <th>時間</th><th>電話號碼</th><th>客戶姓名</th><th>地址</th><th>狀態</th>
+          <th>時間</th><th>電話號碼</th><th>狀態</th>
           <th>接聽分機</th><th>通話秒數</th><th>錄音檔</th>
         </tr>
       </thead>
@@ -136,22 +132,7 @@
     </div>
     <div class="section-title">員工列表</div>
     <table class="data-table" id="empTable">
-      <thead><tr><th>編號</th><th>員工編號</th><th>姓名</th><th>角色</th><th>分機</th><th>座位機碼</th><th>虛擬內線</th><th>停用</th><th>密碼</th></tr></thead>
-      <tbody></tbody>
-    </table>
-  </div>
-
-  <!-- 客戶管理（admin） -->
-  <div id="tab-customers" class="tab-panel">
-    <div class="toolbar">
-      <input type="text" id="custSearchTel" placeholder="用電話號碼搜尋" style="width:160px;" />
-      <button id="custSearchBtn">搜尋</button>
-      <button id="custAddBtn">新增客戶</button>
-      <button id="custRefreshBtn">重新整理</button>
-    </div>
-    <div class="section-title">客戶列表</div>
-    <table class="data-table" id="custTable">
-      <thead><tr><th>編號</th><th>姓名</th><th>電話</th><th>縣市</th><th>鄉鎮</th><th>地址</th><th>黑名單</th></tr></thead>
+      <thead><tr><th>編號</th><th>員工編號</th><th>姓名</th><th>角色</th><th>分機</th><th>座位機碼</th><th>停用</th><th>密碼</th></tr></thead>
       <tbody></tbody>
     </table>
   </div>
@@ -198,53 +179,14 @@
     </div>
   </div>
 
-  <!-- 新增客戶視窗 -->
-  <div class="modal-backdrop" id="custAddBackdrop">
-    <div class="modal-box">
-      <h2>新增客戶</h2>
-      <div class="field"><label>電話</label><input type="text" id="custAddTel" /></div>
-      <div class="field"><label>姓名</label><input type="text" id="custAddName" /></div>
-      <div class="field"><label>縣市</label><input type="text" id="custAddCounty" /></div>
-      <div class="field"><label>鄉鎮</label><input type="text" id="custAddTownship" /></div>
-      <div class="field"><label>地址</label><input type="text" id="custAddAddress" /></div>
-      <div class="modal-actions">
-        <button class="secondary" id="custAddCancelBtn">取消</button>
-        <button class="primary" id="custAddSaveBtn">新增</button>
-      </div>
-      <div class="error-msg" id="custAddMsg"></div>
-    </div>
-  </div>
-
-  <!-- 來電螢幕彈出視窗 -->
+  <!-- 來電螢幕彈出視窗：只顯示來電號碼，沒有客戶資料表可查詢/儲存 -->
   <div class="modal-backdrop" id="popBackdrop">
     <div class="modal-box" id="popBox">
-      <h2>
-        來電資訊
-        <span id="popNewFlag" class="new-customer-flag" style="display:none;">新客戶</span>
-        <span id="popBlacklistFlag" class="blacklist-flag" style="display:none;">黑名單</span>
-      </h2>
+      <h2>來電資訊</h2>
       <p>來電號碼：<strong id="popTelNo"></strong></p>
-      <div class="field">
-        <label>姓名</label>
-        <input type="text" id="popName" />
-      </div>
-      <div class="field">
-        <label>縣市</label>
-        <input type="text" id="popCounty" />
-      </div>
-      <div class="field">
-        <label>鄉鎮</label>
-        <input type="text" id="popTownship" />
-      </div>
-      <div class="field">
-        <label>地址</label>
-        <input type="text" id="popAddress" />
-      </div>
       <div class="modal-actions">
-        <button class="secondary" id="popCloseBtn">關閉</button>
-        <button class="primary" id="popSaveBtn">儲存</button>
+        <button class="primary" id="popCloseBtn">關閉</button>
       </div>
-      <div class="error-msg" id="popMsg"></div>
     </div>
   </div>
 
@@ -307,7 +249,6 @@
   <script src="js/inbound-report.js"></script>
   <script src="js/extension.js"></script>
   <script src="js/employees.js"></script>
-  <script src="js/customers.js"></script>
   <script>
     window.Tabs = {
       board: BoardTab,
@@ -315,7 +256,6 @@
       inbound: InboundReportTab,
       extension: ExtensionTab,
       employees: EmployeesTab,
-      customers: CustomersTab,
     };
     // 預設分頁（即時通話看板）跟 WebSocket 連線一開始就啟動。
     BoardTab.init();

@@ -2,7 +2,6 @@
 
 use App\Controllers\AuthController;
 use App\Controllers\CallRecordController;
-use App\Controllers\CustomerController;
 use App\Controllers\EmployeeController;
 use App\Controllers\ExtlinePortController;
 use App\Controllers\MachineController;
@@ -27,15 +26,12 @@ $router->patch('/employees/{id}', [EmployeeController::class, 'update'], [AuthMi
 $router->patch('/employees/{id}/password', [EmployeeController::class, 'changePassword'], [AuthMiddleware::class]);
 $router->post('/employees/{id}/machines/{machineNo}', [EmployeeController::class, 'bindMachine'], [AuthMiddleware::class]);
 $router->delete('/employees/{id}/machines/{machineNo}', [EmployeeController::class, 'unbindMachine'], [AuthMiddleware::class]);
-$router->post('/employees/{id}/ext-lines/{vport}', [EmployeeController::class, 'bindExtLine'], [AuthMiddleware::class]);
-$router->delete('/employees/{id}/ext-lines/{vport}', [EmployeeController::class, 'unbindExtLine'], [AuthMiddleware::class]);
 
-// ---- Customers ------------------------------------------------------------
-$router->post('/customers', [CustomerController::class, 'create'], [AuthMiddleware::class]);
-$router->get('/customers', [CustomerController::class, 'index'], [AuthMiddleware::class]);
-$router->get('/customers/by-tel/{telNo}', [CustomerController::class, 'showByTel'], [AuthMiddleware::class]);
-$router->get('/customers/{id}', [CustomerController::class, 'show'], [AuthMiddleware::class]);
-$router->patch('/customers/{id}', [CustomerController::class, 'update'], [AuthMiddleware::class]);
+// ---- Customers --------------------------------------------------------------
+// 2026-07-03: dropped. This deployment's ADICTICallCenter database has no
+// dbo.customers table and can't have new tables created (see
+// sql/migrate-legacy-adicticallcenter.sql's header comment) - customer
+// management is unavailable here.
 
 // ---- Machines (PBX / CallerID Box / Voice Card slots) ----------------------
 // 這五組（machines / outline-ports / extline-ports）刻意不掛 AuthMiddleware：

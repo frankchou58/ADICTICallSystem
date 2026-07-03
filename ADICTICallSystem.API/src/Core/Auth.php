@@ -13,8 +13,15 @@ use PDO;
  * parameter on every call, so it ended up in web server / proxy logs with
  * no way to revoke it short of changing the password).
  *
- * Here: passwords are hashed with bcrypt (password_hash), and login issues
- * a random, short-lived session token. Only a SHA-256 hash of the token is
+ * 2026-07-03: this customer's ADICTICallCenter database is a pre-existing
+ * one and can't have new tables added (only new columns on existing
+ * tables), so there's no dedicated dbo.sessions table here - the current
+ * session's token hash + expiry live directly on dbo.operators
+ * (session_token_hash/session_expires_at), one active session per operator
+ * (a fresh login overwrites the previous token, matching the legacy
+ * "operator_uuid is the one credential" model but now with expiry).
+ * Passwords are still hashed with bcrypt (password_hash), and login issues
+ * a random, short-lived session token - only a SHA-256 hash of the token is
  * persisted, so a DB leak alone does not yield usable bearer tokens.
  */
 class Auth
@@ -30,7 +37,7 @@ class Auth
     }
 
     /** Returns the raw token to hand to the client; only its hash is stored. */
-    public static function issueSession(PDO $db, int $employeeId): array
+    public static function issueSession(PDO $db, int $operatorId): array
     {
         $ttl = Config::all()['auth']['session_ttl_seconds'];
 
@@ -38,19 +45,20 @@ class Auth
         $tokenHash = hash('sha256', $token);
 
         $stmt = $db->prepare(
-            'INSERT INTO dbo.sessions (employee_id, token_hash, expires_at)
-             VALUES (:employee_id, :token_hash, DATEADD(SECOND, :ttl, SYSUTCDATETIME()))'
+            'UPDATE dbo.operators
+             SET session_token_hash = :token_hash, session_expires_at = DATEADD(SECOND, :ttl, SYSUTCDATETIME())
+             WHERE ID = :id'
         );
         $stmt->execute([
-            'employee_id' => $employeeId,
             'token_hash' => $tokenHash,
             'ttl' => $ttl,
+            'id' => $operatorId,
         ]);
 
         return ['token' => $token, 'expiresInSeconds' => $ttl];
     }
 
-    /** Returns the authenticated employee row, or null if the token is missing/expired/revoked. */
+    /** Returns the authenticated operator row, or null if the token is missing/expired/revoked. */
     public static function resolveSession(PDO $db, ?string $token): ?array
     {
         if (!$token) {
@@ -59,13 +67,11 @@ class Auth
 
         $tokenHash = hash('sha256', $token);
         $stmt = $db->prepare(
-            'SELECT e.id, e.employee_no, e.name, e.role, e.machine_mask, e.ext_num
-             FROM dbo.sessions s
-             JOIN dbo.employees e ON e.id = s.employee_id
-             WHERE s.token_hash = :token_hash
-               AND s.revoked_at IS NULL
-               AND s.expires_at > SYSUTCDATETIME()
-               AND e.is_disabled = 0'
+            'SELECT ID AS id, employee_no, name, role, machine_id, ext_num
+             FROM dbo.operators
+             WHERE session_token_hash = :token_hash
+               AND session_expires_at > SYSUTCDATETIME()
+               AND is_disabled = 0'
         );
         $stmt->execute(['token_hash' => $tokenHash]);
         $row = $stmt->fetch();
@@ -76,7 +82,9 @@ class Auth
     public static function revokeSession(PDO $db, string $token): void
     {
         $tokenHash = hash('sha256', $token);
-        $stmt = $db->prepare('UPDATE dbo.sessions SET revoked_at = SYSUTCDATETIME() WHERE token_hash = :token_hash');
+        $stmt = $db->prepare(
+            'UPDATE dbo.operators SET session_token_hash = NULL, session_expires_at = NULL WHERE session_token_hash = :token_hash'
+        );
         $stmt->execute(['token_hash' => $tokenHash]);
     }
 }

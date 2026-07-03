@@ -7,6 +7,14 @@ use App\Core\Database;
 use App\Core\Request;
 use App\Core\Response;
 
+/**
+ * 2026-07-03: rewritten against the customer's pre-existing ADICTICallCenter
+ * database. "Employees" here are rows in the legacy dbo.operators table
+ * (with employee_no/password_hash/role/session_* columns added by
+ * sql/migrate-legacy-adicticallcenter.sql - no new tables were created).
+ * The old dbo.admin singleton table is left untouched and unused; an
+ * "admin" is now just an operators row with role='admin'.
+ */
 class AuthController extends Controller
 {
     /** POST /auth/login  { employeeNo, password } */
@@ -16,38 +24,40 @@ class AuthController extends Controller
         $password = (string) $request->requireInput('password');
 
         $stmt = $this->db()->prepare(
-            'SELECT id, employee_no, password_hash, name, role, machine_mask, ext_num, is_disabled
-             FROM dbo.employees WHERE employee_no = :employee_no'
+            'SELECT ID AS id, employee_no, password_hash, name, role, machine_id, ext_num, is_disabled
+             FROM dbo.operators WHERE employee_no = :employee_no'
         );
         $stmt->execute(['employee_no' => $employeeNo]);
-        $employee = $stmt->fetch();
+        $operator = $stmt->fetch();
 
         // Always run password_verify, even on a miss, against a fixed dummy
         // hash so a timing difference can't be used to enumerate valid
         // employee numbers.
-        $hashToCheck = $employee['password_hash'] ?? '$2y$10$invalidsaltinvalidsaltinvalidsaltinvalidsaltuY9Ktm';
+        $hashToCheck = $operator['password_hash'] ?? '$2y$10$invalidsaltinvalidsaltinvalidsaltinvalidsaltuY9Ktm';
         $passwordOk = Auth::verifyPassword($password, $hashToCheck);
 
-        if (!$employee || !$passwordOk || (bool) $employee['is_disabled']) {
+        if (!$operator || !$passwordOk || (bool) $operator['is_disabled']) {
             Response::unauthorized('員工編號或密碼錯誤。');
             return;
         }
 
-        $session = Auth::issueSession($this->db(), (int) $employee['id']);
+        $session = Auth::issueSession($this->db(), (int) $operator['id']);
 
-        $update = $this->db()->prepare('UPDATE dbo.employees SET login_at = SYSUTCDATETIME() WHERE id = :id');
-        $update->execute(['id' => $employee['id']]);
+        // login_time/logout_time are legacy int Unix-epoch columns (see
+        // dbo.record's timestamp columns for the same convention).
+        $update = $this->db()->prepare('UPDATE dbo.operators SET login_time = :now WHERE ID = :id');
+        $update->execute(['now' => time(), 'id' => $operator['id']]);
 
         Response::ok([
             'token' => $session['token'],
             'expiresInSeconds' => $session['expiresInSeconds'],
             'employee' => [
-                'id' => (int) $employee['id'],
-                'employeeNo' => $employee['employee_no'],
-                'name' => Database::decodeText($employee['name']),
-                'role' => $employee['role'],
-                'machineMask' => (int) $employee['machine_mask'],
-                'extNum' => $employee['ext_num'],
+                'id' => (int) $operator['id'],
+                'employeeNo' => $operator['employee_no'],
+                'name' => Database::decodeText($operator['name']),
+                'role' => $operator['role'],
+                'machineMask' => (int) $operator['machine_id'],
+                'extNum' => $operator['ext_num'],
             ],
         ], '登入成功。');
     }
@@ -62,7 +72,7 @@ class AuthController extends Controller
     public function employeeNumbers(Request $request): void
     {
         $stmt = $this->db()->prepare(
-            'SELECT employee_no, name FROM dbo.employees WHERE is_disabled = 0 ORDER BY employee_no'
+            'SELECT employee_no, name FROM dbo.operators WHERE is_disabled = 0 AND employee_no IS NOT NULL ORDER BY employee_no'
         );
         $stmt->execute();
 
@@ -82,8 +92,8 @@ class AuthController extends Controller
             Auth::revokeSession($this->db(), $token);
         }
 
-        $stmt = $this->db()->prepare('UPDATE dbo.employees SET logout_at = SYSUTCDATETIME() WHERE id = :id');
-        $stmt->execute(['id' => $request->employee['id']]);
+        $stmt = $this->db()->prepare('UPDATE dbo.operators SET logout_time = :now WHERE ID = :id');
+        $stmt->execute(['now' => time(), 'id' => $request->employee['id']]);
 
         Response::ok(null, '已登出。');
     }
@@ -96,7 +106,7 @@ class AuthController extends Controller
             'employeeNo' => $request->employee['employee_no'],
             'name' => Database::decodeText($request->employee['name']),
             'role' => $request->employee['role'],
-            'machineMask' => (int) $request->employee['machine_mask'],
+            'machineMask' => (int) $request->employee['machine_id'],
             'extNum' => $request->employee['ext_num'],
         ]);
     }

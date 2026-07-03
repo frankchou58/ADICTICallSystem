@@ -403,22 +403,3 @@ table.data-table tbody tr:hover {
   flex: 1;
 }
 
-.new-customer-flag {
-  display: inline-block;
-  background: #1fd3ab;
-  color: #033;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 12px;
-  margin-left: 8px;
-}
-
-.blacklist-flag {
-  display: inline-block;
-  background: #000;
-  color: #fff;
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 12px;
-  margin-left: 8px;
-}

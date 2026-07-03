@@ -185,35 +185,21 @@ const BoardTab = (() => {
       return;
     }
 
-    let customer = null;
-    try {
-      customer = await CustomerPanel.lookupByTel(call.telNo);
-    } catch (err) {
-      // 客戶查詢失敗不影響看板本身繼續顯示通話狀態
-    }
-
-    // 顏色邏輯跟舊版一致：先依 CallType 給預設色，CallStatus 為
-    // 撥入/通話/待機時蓋掉，黑名單來電或新客戶再蓋一次。
+    // 顏色邏輯：先依 CallType 給預設色，CallStatus 為撥入/通話中時蓋掉。
+    // 2026-07-03：這台部署沒有 customers 資料表，拿掉了黑名單來電判斷
+    // （原本會查詢客戶資料決定要不要標黑名單顏色）。
     let bg = call.callType === 0 ? '#1FD3AB' : call.callType === 1 ? '#FFFFBC' : '#E7B0E8';
     let color = '#000';
     if (call.callStatus === 1) bg = '#FFC9C9';
     else if (call.callStatus === 3) bg = '#82FF82';
-    if (customer && customer.isBlacklisted) {
-      bg = '#000000';
-      color = '#FFFFFF';
-    } else if (!customer) {
-      bg = '#82FF82';
-    }
 
     statusEl.textContent = CALL_STATUS_LABEL[call.callStatus] || '';
     statusEl.style.background = bg;
     statusEl.style.color = color;
     callIdEl.style.background = bg;
     callIdEl.style.color = color;
-    callIdEl.textContent = customer ? customer.name : (call.telNo || '');
-    document.getElementById(`box-address-${call.vport}`).textContent = customer
-      ? `${customer.county || ''}${customer.township || ''}${customer.address || ''}`
-      : (call.telNo ? '新客戶' : '');
+    callIdEl.textContent = call.telNo || '';
+    document.getElementById(`box-address-${call.vport}`).textContent = '';
 
     if (call.extNum) {
       extEl.textContent = `分機 ${call.extNum}`;

@@ -9,10 +9,20 @@ use App\Core\Response;
 use App\Core\ValidationException;
 
 /**
- * Employees unify the legacy "operators" and "admin" tables. `role` is one
- * of operator | supervisor | admin. machineMask is the same bit-field the
- * original design used for supervisors watching multiple machine codes -
- * an ordinary operator simply has exactly one bit set.
+ * 2026-07-03: rewritten against the customer's pre-existing ADICTICallCenter
+ * database - "employees" are rows in the legacy dbo.operators table
+ * (employee_no/password_hash/role/is_disabled/session_* columns added by
+ * sql/migrate-legacy-adicticallcenter.sql; no new tables were created).
+ * `role` is one of operator | supervisor | admin (the old dbo.admin
+ * singleton table is left untouched and unused - an "admin" is now just an
+ * operators row with role='admin'). machineMask reuses operators.machine_id,
+ * which the legacy code already treated as a bit-field (see
+ * SetOperatorMachineID.php) - an ordinary operator has exactly one bit set.
+ *
+ * Dropped in this rewrite: the "虛擬內線指派" (employee↔ext-line) feature
+ * added 2026-07-02 needed a new dbo.employee_ext_lines join table, which
+ * isn't possible here (no new tables allowed) - extVports/bindExtLine/
+ * unbindExtLine are gone until a column-based redesign is agreed on.
  */
 class EmployeeController extends Controller
 {
@@ -34,10 +44,23 @@ class EmployeeController extends Controller
             throw new ValidationException('role 必須是以下其中一種：' . implode('、', self::ROLES));
         }
 
+        // employee_id (the legacy int column, distinct from the new
+        // employee_no this API actually authenticates with) has a
+        // pre-existing UNIQUE constraint from before this rewrite
+        // (UQ__operator__...) that isn't filtered to exclude NULLs - SQL
+        // Server only allows ONE row with employee_id IS NULL per that
+        // constraint, so leaving it unset would let exactly one employee
+        // ever be created. Give every new row a synthetic-but-unique value
+        // instead of leaving it NULL; UPDLOCK+HOLDLOCK on the MAX()
+        // subquery avoids a race between two concurrent creates picking
+        // the same next value (this table sees admin-only, low-frequency
+        // writes, so a table-level lock for the duration of one INSERT is
+        // an acceptable cost here).
         $stmt = $this->db()->prepare(
-            'INSERT INTO dbo.employees (employee_no, password_hash, name, role)
-             OUTPUT INSERTED.id
-             VALUES (:employee_no, :password_hash, :name, :role)'
+            'INSERT INTO dbo.operators (employee_id, employee_no, password_hash, name, role)
+             OUTPUT INSERTED.ID
+             VALUES ((SELECT ISNULL(MAX(employee_id), 0) + 1 FROM dbo.operators WITH (UPDLOCK, HOLDLOCK)),
+                     :employee_no, :password_hash, :name, :role)'
         );
         try {
             $this->executeWithParams($stmt, [
@@ -48,7 +71,17 @@ class EmployeeController extends Controller
             ], ['name']);
         } catch (\PDOException $e) {
             if ($this->isUniqueViolation($e)) {
-                Response::error("員工編號「$employeeNo」已經存在。", 409);
+                // {$employeeNo} (braced), not "$employeeNo」" bare: PHP's
+                // double-quoted-string variable lexer treats bytes
+                // \x80-\xFF as valid identifier characters (legacy
+                // behaviour), so a bare $var immediately followed by a
+                // full-width CJK character (whose UTF-8 encoding starts
+                // with such a byte) gets greedily absorbed into the
+                // variable name instead of ending at the intended
+                // boundary - silently producing an undefined-variable
+                // notice and an empty interpolation. Confirmed reproducing
+                // against this exact line before this fix.
+                Response::error("員工編號「{$employeeNo}」已經存在。", 409);
                 return;
             }
             throw $e;
@@ -68,14 +101,14 @@ class EmployeeController extends Controller
         [$limit, $offset] = $this->paginationArgs($request);
         $role = $request->query['role'] ?? null;
 
-        $sql = 'SELECT id, employee_no, name, role, machine_mask, ext_num, login_at, logout_at, is_disabled
-                FROM dbo.employees';
+        $sql = 'SELECT ID AS id, employee_no, name, role, machine_id, ext_num, login_time, logout_time, is_disabled
+                FROM dbo.operators';
         $params = [];
         if ($role) {
             $sql .= ' WHERE role = :role';
             $params['role'] = $role;
         }
-        $sql .= ' ORDER BY id OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY';
+        $sql .= ' ORDER BY ID OFFSET :offset ROWS FETCH NEXT :limit ROWS ONLY';
 
         $stmt = $this->db()->prepare($sql);
         foreach ($params as $key => $value) {
@@ -100,7 +133,7 @@ class EmployeeController extends Controller
         $extNum = (int) $request->params['extNum'];
 
         $stmt = $this->db()->prepare(
-            'SELECT id, employee_no, name FROM dbo.employees WHERE ext_num = :ext_num AND is_disabled = 0'
+            'SELECT ID AS id, employee_no, name FROM dbo.operators WHERE ext_num = :ext_num AND is_disabled = 0'
         );
         $stmt->execute(['ext_num' => $extNum]);
         $row = $stmt->fetch();
@@ -128,8 +161,8 @@ class EmployeeController extends Controller
         }
 
         $stmt = $this->db()->prepare(
-            'SELECT id, employee_no, name, role, machine_mask, ext_num, login_at, logout_at, is_disabled
-             FROM dbo.employees WHERE id = :id'
+            'SELECT ID AS id, employee_no, name, role, machine_id, ext_num, login_time, logout_time, is_disabled
+             FROM dbo.operators WHERE ID = :id'
         );
         $stmt->execute(['id' => $id]);
         $row = $stmt->fetch();
@@ -184,8 +217,7 @@ class EmployeeController extends Controller
             throw new ValidationException('沒有提供任何可更新的欄位。');
         }
 
-        $fields[] = 'updated_at = SYSUTCDATETIME()';
-        $sql = 'UPDATE dbo.employees SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $sql = 'UPDATE dbo.operators SET ' . implode(', ', $fields) . ' WHERE ID = :id';
         $stmt = $this->db()->prepare($sql);
         $this->executeWithParams($stmt, $params, ['name']);
 
@@ -213,7 +245,7 @@ class EmployeeController extends Controller
 
         if ($isSelf) {
             $currentPassword = (string) $request->requireInput('currentPassword');
-            $stmt = $this->db()->prepare('SELECT password_hash FROM dbo.employees WHERE id = :id');
+            $stmt = $this->db()->prepare('SELECT password_hash FROM dbo.operators WHERE ID = :id');
             $stmt->execute(['id' => $id]);
             $row = $stmt->fetch();
             if (!$row || !Auth::verifyPassword($currentPassword, $row['password_hash'])) {
@@ -222,9 +254,7 @@ class EmployeeController extends Controller
             }
         }
 
-        $stmt = $this->db()->prepare(
-            'UPDATE dbo.employees SET password_hash = :hash, updated_at = SYSUTCDATETIME() WHERE id = :id'
-        );
+        $stmt = $this->db()->prepare('UPDATE dbo.operators SET password_hash = :hash WHERE ID = :id');
         $stmt->execute(['hash' => Auth::hashPassword($newPassword), 'id' => $id]);
 
         Response::ok(null, '密碼已變更。');
@@ -259,8 +289,8 @@ class EmployeeController extends Controller
 
         $bit = 1 << ($machineNo - 1);
         $sql = $set
-            ? 'UPDATE dbo.employees SET machine_mask = machine_mask | :bit, updated_at = SYSUTCDATETIME() WHERE id = :id'
-            : 'UPDATE dbo.employees SET machine_mask = machine_mask & ~:bit, updated_at = SYSUTCDATETIME() WHERE id = :id';
+            ? 'UPDATE dbo.operators SET machine_id = ISNULL(machine_id, 0) | :bit WHERE ID = :id'
+            : 'UPDATE dbo.operators SET machine_id = ISNULL(machine_id, 0) & ~:bit WHERE ID = :id';
 
         $stmt = $this->db()->prepare($sql);
         $stmt->execute(['bit' => $bit, 'id' => $id]);
@@ -271,52 +301,6 @@ class EmployeeController extends Controller
         }
 
         Response::ok(null, $set ? '座位機碼已綁定。' : '座位機碼已解除綁定。');
-    }
-
-    /** POST /employees/{id}/ext-lines/{vport} - assign a virtual internal line (dbo.extline_ports.vport) to this employee. */
-    public function bindExtLine(Request $request): void
-    {
-        if (!$this->requireRole($request, ['admin'])) {
-            return;
-        }
-
-        $id = (int) $request->params['id'];
-        $vport = (int) $request->params['vport'];
-
-        $stmt = $this->db()->prepare('INSERT INTO dbo.employee_ext_lines (employee_id, ext_vport) VALUES (:id, :vport)');
-        try {
-            $stmt->execute(['id' => $id, 'vport' => $vport]);
-        } catch (\PDOException $e) {
-            if (!$this->isUniqueViolation($e)) {
-                throw $e;
-            }
-            // 已經指派過了，當作成功（跟 toggleMachineBit 的 idempotent 精神一致）。
-        }
-
-        Response::ok(null, '虛擬內線已指派。');
-    }
-
-    /** DELETE /employees/{id}/ext-lines/{vport} - unassign a virtual internal line. */
-    public function unbindExtLine(Request $request): void
-    {
-        if (!$this->requireRole($request, ['admin'])) {
-            return;
-        }
-
-        $id = (int) $request->params['id'];
-        $vport = (int) $request->params['vport'];
-
-        $stmt = $this->db()->prepare('DELETE FROM dbo.employee_ext_lines WHERE employee_id = :id AND ext_vport = :vport');
-        $stmt->execute(['id' => $id, 'vport' => $vport]);
-
-        Response::ok(null, '虛擬內線已取消指派。');
-    }
-
-    private function fetchExtVports(int $employeeId): array
-    {
-        $stmt = $this->db()->prepare('SELECT ext_vport FROM dbo.employee_ext_lines WHERE employee_id = :id ORDER BY ext_vport');
-        $stmt->execute(['id' => $employeeId]);
-        return array_map('intval', array_column($stmt->fetchAll(), 'ext_vport'));
     }
 
     private function canAccessEmployee(Request $request, int $id): bool
@@ -338,11 +322,11 @@ class EmployeeController extends Controller
             'employeeNo' => $row['employee_no'],
             'name' => Database::decodeText($row['name']),
             'role' => $row['role'],
-            'machineMask' => (int) $row['machine_mask'],
-            'extVports' => $this->fetchExtVports((int) $row['id']),
+            'machineMask' => (int) $row['machine_id'],
             'extNum' => $row['ext_num'],
-            'loginAt' => $row['login_at'],
-            'logoutAt' => $row['logout_at'],
+            // login_time/logout_time are legacy int Unix-epoch columns, not DATETIME2.
+            'loginAt' => $row['login_time'] !== null ? (int) $row['login_time'] : null,
+            'logoutAt' => $row['logout_time'] !== null ? (int) $row['logout_time'] : null,
             'isDisabled' => (bool) $row['is_disabled'],
         ];
     }
